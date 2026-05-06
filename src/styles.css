@@ -1,0 +1,244 @@
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #edf3f8;
+  color: #173148;
+}
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top left, rgba(71, 120, 165, 0.2), transparent 30%),
+    linear-gradient(135deg, #edf3f8, #f7fafc);
+}
+
+.login-card {
+  width: min(960px, 100%);
+  background: #fff;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(20, 47, 72, 0.12);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.login-left-panel {
+  background: linear-gradient(160deg, #315f86, #467cad);
+  color: #fff;
+  padding: 48px 42px;
+  display: flex;
+  align-items: center;
+}
+
+.login-form-panel {
+  padding: 44px 40px;
+}
+
+.login-title {
+  color: #315f86;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 38px;
+  border: none;
+  background: transparent;
+  color: #315f86;
+}
+
+.dashboard-shell {
+  /* min-height: 100vh; */
+  height: 100vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+}
+
+.portal-sidebar {
+  height: 100vh;
+  background: linear-gradient(180deg, #315f86, #274c6c);
+  color: #fff;
+  padding: 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+
+.avatar-pill {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid rgba(255, 255, 255, 0.55);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-link {
+  color: #e8f1fa;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.sidebar-link:hover,
+.sidebar-link.active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.portal-main {
+  height: 100vh;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.mobile-topbar {
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.content-card {
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 12px 30px rgba(18, 46, 74, 0.06);
+  border: 1px solid #e2ebf3;
+  padding: 24px;
+}
+
+.content-card-center {
+  min-height: calc(100vh - 120px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.section-title {
+  color: #224566;
+  font-weight: 700;
+}
+
+.page-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.95fr);
+  gap: 20px;
+  align-items: start;
+}
+.page-grid-task-creation {
+  display: grid;
+  /* grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.95fr); */
+  gap: 20px;
+  align-items: start;
+}
+.sticky-card {
+  position: sticky;
+  top: 24px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+}
+
+.stat-box {
+  background: #f7fbff;
+  border: 1px solid #e4edf6;
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.stat-label {
+  color: #5e7690;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value {
+  margin-top: 0.4rem;
+  color: #1d4263;
+  font-size: 1.28rem;
+  font-weight: 700;
+}
+
+.empty-state {
+  padding: 28px 14px;
+  text-align: center;
+  color: #71859b;
+}
+
+.sidebar-overlay {
+  display: none;
+}
+
+
+
+@media (max-width: 991px) {
+  .page-grid,
+  .dashboard-shell,
+  .login-card {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 1100;
+  }
+
+  .portal-sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 1090;
+  }
+
+  .portal-main {
+    padding: 16px;
+  }
+
+  .mobile-topbar {
+    display: flex;
+  }
+}
