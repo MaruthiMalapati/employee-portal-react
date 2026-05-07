@@ -167,6 +167,20 @@ body {
   top: 24px;
 }
 
+.btn-action-pill {
+   display: inline-flex;
+   align-items: center;
+   gap: 10px;
+   border-radius: 999px;
+   padding: 0.8rem 1.2rem;
+   font-weight: 700;
+   box-shadow: 0 12px 24px rgba(49, 95, 134, 0.2);
+}
+
+.btn-action-pill i {
+   font-size: 1rem;
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));

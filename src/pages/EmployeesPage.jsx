@@ -95,6 +95,26 @@ export default function EmployeesPage() {
     }
   };
 
+  const deleteEmployeeById = async employee => {
+    if (!window.confirm(`Delete ${employee.name}?`)) return;
+
+    try {
+      await apiRequest("/api/admin/delete-employee", withAuth(token, {
+        method: "POST",
+        body: JSON.stringify({ id: employee.id })
+      }));
+
+      if (editing?.id === employee.id) {
+        setEditing(null);
+        setFormVisible(false);
+      }
+
+      await loadEmployees();
+    } catch (requestError) {
+      setError(requestError.message || "Unable to delete employee.");
+    }
+  };
+
   const openCreateForm = () => {
     setError("");
     setEditing(null);
@@ -124,7 +144,10 @@ export default function EmployeesPage() {
             <p className="text-muted mb-0">Review the full employee list first, then open the form only when you need to create or update an account.</p>
           </div>
           <div className="d-flex align-items-center gap-2">
-            <button className="btn btn-brand" onClick={openCreateForm}>Create Employee</button>
+            <button className="btn btn-brand btn-action-pill" onClick={openCreateForm}>
+              <i className="bi bi-person-plus-fill" aria-hidden="true"></i>
+              <span>Create Employee</span>
+            </button>
             <span className="badge rounded-pill text-bg-light border px-3 py-2">{employees.length} employees</span>
           </div>
         </div>
@@ -151,14 +174,22 @@ export default function EmployeesPage() {
                   <td>{employee.email}</td>
                   <td>{employee.role}</td>
                    <td>{employee.is_active ? "Active" : "Disabled"}</td>
-                   <td>
-                     <button
-                       className="btn btn-sm btn-outline-primary"
-                       onClick={() => openEditForm(employee)}
-                     >
-                       Edit
-                     </button>
-                  </td>
+                    <td>
+                      <div className="d-flex flex-wrap gap-2">
+                        <button
+                          className="btn btn-sm btn-outline-primary"
+                          onClick={() => openEditForm(employee)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn btn-sm btn-outline-danger"
+                          onClick={() => deleteEmployeeById(employee)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                   </td>
                 </tr>
               ))}
             </tbody>
