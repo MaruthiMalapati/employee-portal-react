@@ -71,6 +71,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sidebar-profile {
