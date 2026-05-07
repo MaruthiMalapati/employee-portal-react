@@ -15,6 +15,7 @@ export default function EmployeesPage() {
   const { token } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [createForm, setCreateForm] = useState(initialCreateForm);
+  const [formVisible, setFormVisible] = useState(false);
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState("");
 
@@ -41,6 +42,7 @@ export default function EmployeesPage() {
         body: JSON.stringify(createForm)
       }));
       setCreateForm(initialCreateForm);
+      setFormVisible(false);
       await loadEmployees();
     } catch (requestError) {
       setError(requestError.message || "Unable to create employee.");
@@ -69,6 +71,7 @@ export default function EmployeesPage() {
         body: JSON.stringify(payload)
       }));
       setEditing(null);
+      setFormVisible(false);
       await loadEmployees();
     } catch (requestError) {
       setError(requestError.message || "Unable to update employee.");
@@ -85,59 +88,45 @@ export default function EmployeesPage() {
         body: JSON.stringify({ id: editing.id })
       }));
       setEditing(null);
+      setFormVisible(false);
       await loadEmployees();
     } catch (requestError) {
       setError(requestError.message || "Unable to delete employee.");
     }
   };
 
+  const openCreateForm = () => {
+    setError("");
+    setEditing(null);
+    setCreateForm(initialCreateForm);
+    setFormVisible(true);
+  };
+
+  const openEditForm = employee => {
+    setError("");
+    setEditing({ ...employee, password: "" });
+    setFormVisible(true);
+  };
+
+  const closeForm = () => {
+    setError("");
+    setEditing(null);
+    setCreateForm(initialCreateForm);
+    setFormVisible(false);
+  };
+
   return (
-    <div className="page-grid">
-      <div className="content-card">
-        <h2 className="section-title">Create Employee</h2>
-        <p className="text-muted">Create a new employee account with admin-only access control.</p>
-
-        <form onSubmit={submitCreate} className="row g-3">
-          <div className="col-md-6">
-            <label className="form-label">Name</label>
-            <input className="form-control" value={createForm.name} onChange={event => setCreateForm(current => ({ ...current, name: event.target.value }))} />
-          </div>
-          <div className="col-md-6">
-            <label className="form-label">Username</label>
-            <input className="form-control" value={createForm.username} onChange={event => setCreateForm(current => ({ ...current, username: event.target.value }))} />
-          </div>
-          <div className="col-md-6">
-            <label className="form-label">Email</label>
-            <input className="form-control" value={createForm.email} onChange={event => setCreateForm(current => ({ ...current, email: event.target.value }))} />
-          </div>
-          <div className="col-md-6">
-            <label className="form-label">Temporary Password</label>
-            <input type="password" className="form-control" value={createForm.password} onChange={event => setCreateForm(current => ({ ...current, password: event.target.value }))} />
-          </div>
-          <div className="col-md-6">
-            <label className="form-label">Manager Email</label>
-            <input className="form-control" value={createForm.manager_email} onChange={event => setCreateForm(current => ({ ...current, manager_email: event.target.value }))} />
-          </div>
-          <div className="col-md-6">
-            <label className="form-label">Role</label>
-            <select className="form-select" value={createForm.role} onChange={event => setCreateForm(current => ({ ...current, role: event.target.value }))}>
-              <option value="EMPLOYEE">EMPLOYEE</option>
-              <option value="ADMIN">ADMIN</option>
-            </select>
-          </div>
-          <div className="col-12">
-            <button className="btn btn-brand">Create Employee</button>
-          </div>
-        </form>
-      </div>
-
+    <div className={!formVisible ? "page-grid-task-creation" : "page-grid"}>
       <div className="content-card">
         <div className="d-flex justify-content-between align-items-center mb-3">
           <div>
-            <h2 className="section-title mb-1">Manage Employees</h2>
-            <p className="text-muted mb-0">Update employee roles, status, and password from one place.</p>
+            <h2 className="section-title mb-1">Employees</h2>
+            <p className="text-muted mb-0">Review the full employee list first, then open the form only when you need to create or update an account.</p>
           </div>
-          <span className="badge rounded-pill text-bg-light border px-3 py-2">{employees.length} employees</span>
+          <div className="d-flex align-items-center gap-2">
+            <button className="btn btn-brand" onClick={openCreateForm}>Create Employee</button>
+            <span className="badge rounded-pill text-bg-light border px-3 py-2">{employees.length} employees</span>
+          </div>
         </div>
 
         {error ? <div className="alert alert-danger py-2">{error}</div> : null}
@@ -161,24 +150,40 @@ export default function EmployeesPage() {
                   <td>{employee.name}</td>
                   <td>{employee.email}</td>
                   <td>{employee.role}</td>
-                  <td>{employee.is_active ? "Active" : "Disabled"}</td>
-                  <td>
-                    <button
-                      className="btn btn-sm btn-outline-primary"
-                      onClick={() => setEditing({ ...employee, password: "" })}
-                    >
-                      Edit
-                    </button>
+                   <td>{employee.is_active ? "Active" : "Disabled"}</td>
+                   <td>
+                     <button
+                       className="btn btn-sm btn-outline-primary"
+                       onClick={() => openEditForm(employee)}
+                     >
+                       Edit
+                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      </div>
 
-        {editing ? (
-          <form onSubmit={submitUpdate} className="border-top pt-4 mt-3">
-            <h3 className="h6 fw-bold mb-3">Edit Employee</h3>
+      {formVisible ? (
+        <div className="content-card sticky-card">
+          <div className="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h2 className="section-title mb-1">{editing ? "Edit Employee" : "Create Employee"}</h2>
+              <p className="text-muted mb-0">
+                {editing ? "Update employee access, status, or password." : "Create a new employee account with admin-only access control."}
+              </p>
+            </div>
+            <button type="button" className="btn btn-outline-secondary btn-sm rounded-pill" onClick={closeForm}>
+              Close
+            </button>
+          </div>
+
+          {error ? <div className="alert alert-danger py-2">{error}</div> : null}
+
+          {editing ? (
+          <form onSubmit={submitUpdate}>
             <div className="row g-3">
               <div className="col-md-6">
                 <label className="form-label">Name</label>
@@ -211,11 +216,46 @@ export default function EmployeesPage() {
             <div className="d-flex gap-2 mt-4">
               <button className="btn btn-brand">Update</button>
               <button type="button" className="btn btn-outline-danger" onClick={deleteEmployee}>Delete</button>
-              <button type="button" className="btn btn-outline-secondary" onClick={() => setEditing(null)}>Cancel</button>
+              <button type="button" className="btn btn-outline-secondary" onClick={closeForm}>Cancel</button>
             </div>
           </form>
-        ) : null}
-      </div>
+          ) : (
+          <form onSubmit={submitCreate} className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label">Name</label>
+              <input className="form-control" value={createForm.name} onChange={event => setCreateForm(current => ({ ...current, name: event.target.value }))} />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label">Username</label>
+              <input className="form-control" value={createForm.username} onChange={event => setCreateForm(current => ({ ...current, username: event.target.value }))} />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label">Email</label>
+              <input className="form-control" value={createForm.email} onChange={event => setCreateForm(current => ({ ...current, email: event.target.value }))} />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label">Temporary Password</label>
+              <input type="password" className="form-control" value={createForm.password} onChange={event => setCreateForm(current => ({ ...current, password: event.target.value }))} />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label">Manager Email</label>
+              <input className="form-control" value={createForm.manager_email} onChange={event => setCreateForm(current => ({ ...current, manager_email: event.target.value }))} />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label">Role</label>
+              <select className="form-select" value={createForm.role} onChange={event => setCreateForm(current => ({ ...current, role: event.target.value }))}>
+                <option value="EMPLOYEE">EMPLOYEE</option>
+                <option value="ADMIN">ADMIN</option>
+              </select>
+            </div>
+            <div className="col-12 d-flex gap-2 mt-2">
+              <button className="btn btn-brand">Create Employee</button>
+              <button type="button" className="btn btn-outline-secondary" onClick={closeForm}>Cancel</button>
+            </div>
+          </form>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
