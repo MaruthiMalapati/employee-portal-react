@@ -14,10 +14,17 @@ const initialCreateForm = {
 export default function EmployeesPage() {
   const { token } = useAuth();
   const [employees, setEmployees] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("active");
   const [createForm, setCreateForm] = useState(initialCreateForm);
   const [formVisible, setFormVisible] = useState(false);
   const [editing, setEditing] = useState(null);
   const [error, setError] = useState("");
+
+  const visibleEmployees = employees.filter(employee => {
+    if (statusFilter === "all") return true;
+    if (statusFilter === "disabled") return !employee.is_active;
+    return employee.is_active;
+  });
 
   useEffect(() => {
     loadEmployees();
@@ -78,40 +85,25 @@ export default function EmployeesPage() {
     }
   };
 
-  const deleteEmployee = async () => {
-    if (!editing) return;
-    if (!window.confirm("Delete this employee?")) return;
+  const disableEmployee = async employee => {
+    if (!window.confirm(`Disable ${employee.name}? They will not be able to log in.`)) return;
 
     try {
-      await apiRequest("/api/admin/delete-employee", withAuth(token, {
+      await apiRequest("/api/admin/update-employee", withAuth(token, {
         method: "POST",
-        body: JSON.stringify({ id: editing.id })
-      }));
-      setEditing(null);
-      setFormVisible(false);
-      await loadEmployees();
-    } catch (requestError) {
-      setError(requestError.message || "Unable to delete employee.");
-    }
-  };
-
-  const deleteEmployeeById = async employee => {
-    if (!window.confirm(`Delete ${employee.name}?`)) return;
-
-    try {
-      await apiRequest("/api/admin/delete-employee", withAuth(token, {
-        method: "POST",
-        body: JSON.stringify({ id: employee.id })
+        body: JSON.stringify({
+          id: employee.id,
+          is_active: false
+        })
       }));
 
       if (editing?.id === employee.id) {
-        setEditing(null);
-        setFormVisible(false);
+        setEditing(current => current ? { ...current, is_active: false } : current);
       }
 
       await loadEmployees();
     } catch (requestError) {
-      setError(requestError.message || "Unable to delete employee.");
+      setError(requestError.message || "Unable to disable employee.");
     }
   };
 
@@ -141,18 +133,36 @@ export default function EmployeesPage() {
         <div className="d-flex justify-content-between align-items-center mb-3">
           <div>
             <h2 className="section-title mb-1">Employees</h2>
-            <p className="text-muted mb-0">Review the full employee list first, then open the form only when you need to create or update an account.</p>
+            <p className="text-muted mb-0">Active employees are shown first by default. Disable accounts from the list, and re-enable them later from the disabled view when needed.</p>
           </div>
           <div className="d-flex align-items-center gap-2">
             <button className="btn btn-brand btn-action-pill" onClick={openCreateForm}>
               <i className="bi bi-person-plus-fill" aria-hidden="true"></i>
               <span>Create Employee</span>
             </button>
-            <span className="badge rounded-pill text-bg-light border px-3 py-2">{employees.length} employees</span>
+            <span className="badge rounded-pill text-bg-light border px-3 py-2">{visibleEmployees.length} employees</span>
           </div>
         </div>
 
         {error ? <div className="alert alert-danger py-2">{error}</div> : null}
+
+        <div className="d-flex align-items-end justify-content-between gap-3 mb-3 flex-wrap">
+          <div className="employee-filter-select">
+            <label className="form-label">View Employees</label>
+            <select
+              className="form-select"
+              value={statusFilter}
+              onChange={event => setStatusFilter(event.target.value)}
+            >
+              <option value="active">Active Only</option>
+              <option value="disabled">Disabled Only</option>
+              <option value="all">All Employees</option>
+            </select>
+          </div>
+          <div className="text-muted small">
+            Total records: {employees.length}
+          </div>
+        </div>
 
         <div className="table-responsive">
           <table className="table align-middle">
@@ -167,7 +177,7 @@ export default function EmployeesPage() {
               </tr>
             </thead>
             <tbody>
-              {employees.map(employee => (
+              {visibleEmployees.length ? visibleEmployees.map(employee => (
                 <tr key={employee.id}>
                   <td>{employee.employee_code}</td>
                   <td>{employee.name}</td>
@@ -182,16 +192,24 @@ export default function EmployeesPage() {
                         >
                           Edit
                         </button>
-                        <button
-                          className="btn btn-sm btn-outline-danger"
-                          onClick={() => deleteEmployeeById(employee)}
-                        >
-                          Delete
-                        </button>
+                        {employee.is_active ? (
+                          <button
+                            className="btn btn-sm btn-outline-warning"
+                            onClick={() => disableEmployee(employee)}
+                          >
+                            Disable
+                          </button>
+                        ) : null}
                       </div>
-                   </td>
+                    </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan="6" className="text-center text-muted py-4">
+                    No employees found for this filter.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -246,7 +264,11 @@ export default function EmployeesPage() {
 
             <div className="d-flex gap-2 mt-4">
               <button className="btn btn-brand">Update</button>
-              <button type="button" className="btn btn-outline-danger" onClick={deleteEmployee}>Delete</button>
+              {editing.is_active ? (
+                <button type="button" className="btn btn-outline-warning" onClick={() => disableEmployee(editing)}>
+                  Disable
+                </button>
+              ) : null}
               <button type="button" className="btn btn-outline-secondary" onClick={closeForm}>Cancel</button>
             </div>
           </form>
