@@ -3,7 +3,7 @@ const API_BASE_URL =
   (window.location.hostname.includes("vercel.app")
     ? "https://employee-portal-backend-zqbo.onrender.com"
     : "http://localhost:3000");
-
+console.log("API Base URL:", API_BASE_URL, " (from env:", import.meta.env.VITE_API_BASE_URL, ")" );
 export async function apiRequest(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
