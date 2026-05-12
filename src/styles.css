@@ -226,23 +226,23 @@ body {
 .page-hero-content {
   position: relative;
   z-index: 1;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 18px;
-  flex-wrap: wrap;
+  align-items: flex-start;
 }
 
 .page-hero-title {
   margin: 0;
-  font-size: clamp(1.65rem, 2vw, 2.2rem);
+  font-size: 2.1rem;
   font-weight: 800;
   letter-spacing: -0.03em;
+  line-height: 1.08;
 }
 
 .page-hero-text {
   margin: 0.7rem 0 0;
-  max-width: 720px;
+  max-width: 620px;
   color: rgba(255, 255, 255, 0.86);
   font-size: 1rem;
   line-height: 1.55;
@@ -254,7 +254,9 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  min-width: fit-content;
 }
 
 .hero-badge {
@@ -552,6 +554,21 @@ textarea.form-control {
   }
 
   .page-hero-content {
-    flex-direction: column;
+    grid-template-columns: 1fr;
+  }
+
+  .page-hero-title {
+    font-size: 1.8rem;
+  }
+
+  .page-hero-actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 576px) {
+  .page-hero-title {
+    font-size: 1.55rem;
   }
 }
