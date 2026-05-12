@@ -141,21 +141,41 @@ export default function PayrollPage() {
   };
 
   return (
-    <div className="page-grid-task-creation">
+    <div className="page-stack">
+      <section className="page-hero">
+        <div className="page-hero-content">
+          <div>
+            <div className="muted-kicker text-white-50">Payroll Hub</div>
+            <h2 className="page-hero-title">{isAdmin ? "Payroll Management" : `${user?.name || "Employee"} Payroll`}</h2>
+            <p className="page-hero-text">
+              Review salary summaries, manage payroll periods, and keep every month organized with a cleaner finance workspace.
+            </p>
+          </div>
+          <div className="page-hero-actions">
+            {isAdmin ? <button className="btn btn-outline-secondary btn-action-pill" onClick={loadPreview}>Preview</button> : null}
+            {isAdmin ? <button className="btn btn-brand btn-action-pill" onClick={generatePayroll}>Generate</button> : null}
+            <span className="hero-badge">{month}</span>
+          </div>
+        </div>
+      </section>
+
+      <div className="page-grid-task-creation">
       {isAdmin ? (
         <div className="content-card">
           <h2 className="section-title">Payroll Controls</h2>
-          <div className="mb-3">
-            <label className="form-label">Payroll Month</label>
-            <input type="month" className="form-control" value={month} onChange={event => setMonth(event.target.value)} />
-          </div>
-          <div className="d-flex gap-2 mb-4">
-            <button className="btn btn-outline-primary" onClick={loadPreview}>Preview</button>
-            <button className="btn btn-brand" onClick={generatePayroll}>Generate</button>
+          <div className="soft-panel mb-4">
+            <div className="mb-3">
+              <label className="form-label">Payroll Month</label>
+              <input type="month" className="form-control" value={month} onChange={event => setMonth(event.target.value)} />
+            </div>
+            <div className="d-flex gap-2">
+              <button className="btn btn-outline-primary" onClick={loadPreview}>Preview</button>
+              <button className="btn btn-brand" onClick={generatePayroll}>Generate</button>
+            </div>
           </div>
 
           <h3 className="h6 fw-bold mb-3">Public Holidays</h3>
-          <form onSubmit={addHoliday} className="mb-3">
+          <form onSubmit={addHoliday} className="soft-panel mb-3">
             <div className="mb-3">
               <label className="form-label">Date</label>
               <input
@@ -326,6 +346,7 @@ export default function PayrollPage() {
             </table>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

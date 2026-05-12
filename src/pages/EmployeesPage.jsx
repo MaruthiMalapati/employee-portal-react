@@ -128,62 +128,75 @@ export default function EmployeesPage() {
   };
 
   return (
-    <div className={!formVisible ? "page-grid-task-creation" : "page-grid"}>
-      <div className="content-card">
-        <div className="d-flex justify-content-between align-items-center mb-3">
+    <div className="page-stack">
+      <section className="page-hero">
+        <div className="page-hero-content">
           <div>
-            <h2 className="section-title mb-1">Employees</h2>
-            <p className="text-muted mb-0">Active employees are shown first by default. Disable accounts from the list, and re-enable them later from the disabled view when needed.</p>
+            <div className="muted-kicker text-white-50">People Management</div>
+            <h2 className="page-hero-title">Employee Directory</h2>
+            <p className="page-hero-text">
+              Manage employee accounts, update access, and keep the organization list clean with one focused admin view.
+            </p>
           </div>
-          <div className="d-flex align-items-center gap-2">
+          <div className="page-hero-actions">
             <button className="btn btn-brand btn-action-pill" onClick={openCreateForm}>
-              <i className="bi bi-person-plus-fill" aria-hidden="true"></i>
+              <i className="bi bi-person-plus-fill" aria-hidden="true" />
               <span>Create Employee</span>
             </button>
-            <span className="badge rounded-pill text-bg-light border px-3 py-2">{visibleEmployees.length} employees</span>
+            <span className="hero-badge">{visibleEmployees.length} employees</span>
           </div>
         </div>
+      </section>
 
-        {error ? <div className="alert alert-danger py-2">{error}</div> : null}
-
-        <div className="d-flex align-items-end justify-content-between gap-3 mb-3 flex-wrap">
-          <div className="employee-filter-select">
-            <label className="form-label">View Employees</label>
-            <select
-              className="form-select"
-              value={statusFilter}
-              onChange={event => setStatusFilter(event.target.value)}
-            >
-              <option value="active">Active Only</option>
-              <option value="disabled">Disabled Only</option>
-              <option value="all">All Employees</option>
-            </select>
+      <div className={!formVisible ? "page-grid-task-creation" : "page-grid"}>
+        <div className="content-card">
+          <div className="mb-3">
+            <h3 className="section-title mb-1">Employee List</h3>
+            <p className="text-muted mb-0">Active employees are shown first by default. Disable accounts from the list, and re-enable them later from the disabled view when needed.</p>
           </div>
-          <div className="text-muted small">
-            Total records: {employees.length}
-          </div>
-        </div>
 
-        <div className="table-responsive">
-          <table className="table align-middle">
-            <thead>
-              <tr>
-                <th>Emp Code</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleEmployees.length ? visibleEmployees.map(employee => (
-                <tr key={employee.id}>
-                  <td>{employee.employee_code}</td>
-                  <td>{employee.name}</td>
-                  <td>{employee.email}</td>
-                  <td>{employee.role}</td>
-                   <td>{employee.is_active ? "Active" : "Disabled"}</td>
+          {error ? <div className="alert alert-danger py-2">{error}</div> : null}
+
+          <div className="soft-panel mb-3">
+            <div className="d-flex align-items-end justify-content-between gap-3 flex-wrap">
+              <div className="employee-filter-select">
+                <label className="form-label">View Employees</label>
+                <select
+                  className="form-select"
+                  value={statusFilter}
+                  onChange={event => setStatusFilter(event.target.value)}
+                >
+                  <option value="active">Active Only</option>
+                  <option value="disabled">Disabled Only</option>
+                  <option value="all">All Employees</option>
+                </select>
+              </div>
+              <div className="text-muted small">
+                Total records: {employees.length}
+              </div>
+            </div>
+          </div>
+
+          <div className="table-responsive">
+            <table className="table align-middle">
+              <thead>
+                <tr>
+                  <th>Emp Code</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleEmployees.length ? visibleEmployees.map(employee => (
+                  <tr key={employee.id}>
+                    <td>{employee.employee_code}</td>
+                    <td>{employee.name}</td>
+                    <td>{employee.email}</td>
+                    <td>{employee.role}</td>
+                    <td>{employee.is_active ? "Active" : "Disabled"}</td>
                     <td>
                       <div className="d-flex flex-wrap gap-2">
                         <button
@@ -202,113 +215,114 @@ export default function EmployeesPage() {
                         ) : null}
                       </div>
                     </td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan="6" className="text-center text-muted py-4">
-                    No employees found for this filter.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {formVisible ? (
-        <div className="content-card sticky-card">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <div>
-              <h2 className="section-title mb-1">{editing ? "Edit Employee" : "Create Employee"}</h2>
-              <p className="text-muted mb-0">
-                {editing ? "Update employee access, status, or password." : "Create a new employee account with admin-only access control."}
-              </p>
-            </div>
-            <button type="button" className="btn btn-outline-secondary btn-sm rounded-pill" onClick={closeForm}>
-              Close
-            </button>
+                  </tr>
+                )) : (
+                  <tr>
+                    <td colSpan="6" className="text-center text-muted py-4">
+                      No employees found for this filter.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-
-          {error ? <div className="alert alert-danger py-2">{error}</div> : null}
-
-          {editing ? (
-          <form onSubmit={submitUpdate}>
-            <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label">Name</label>
-                <input className="form-control" value={editing.name} onChange={event => setEditing(current => ({ ...current, name: event.target.value }))} />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label">Email</label>
-                <input className="form-control" value={editing.email} onChange={event => setEditing(current => ({ ...current, email: event.target.value }))} />
-              </div>
-              <div className="col-md-4">
-                <label className="form-label">Role</label>
-                <select className="form-select" value={editing.role} onChange={event => setEditing(current => ({ ...current, role: event.target.value }))}>
-                  <option value="EMPLOYEE">EMPLOYEE</option>
-                  <option value="ADMIN">ADMIN</option>
-                </select>
-              </div>
-              <div className="col-md-4">
-                <label className="form-label">Status</label>
-                <select className="form-select" value={String(editing.is_active)} onChange={event => setEditing(current => ({ ...current, is_active: event.target.value === "true" }))}>
-                  <option value="true">Active</option>
-                  <option value="false">Disabled</option>
-                </select>
-              </div>
-              <div className="col-md-4">
-                <label className="form-label">New Password</label>
-                <input type="password" className="form-control" value={editing.password} onChange={event => setEditing(current => ({ ...current, password: event.target.value }))} />
-              </div>
-            </div>
-
-            <div className="d-flex gap-2 mt-4">
-              <button className="btn btn-brand">Update</button>
-              {editing.is_active ? (
-                <button type="button" className="btn btn-outline-warning" onClick={() => disableEmployee(editing)}>
-                  Disable
-                </button>
-              ) : null}
-              <button type="button" className="btn btn-outline-secondary" onClick={closeForm}>Cancel</button>
-            </div>
-          </form>
-          ) : (
-          <form onSubmit={submitCreate} className="row g-3">
-            <div className="col-md-6">
-              <label className="form-label">Name</label>
-              <input className="form-control" value={createForm.name} onChange={event => setCreateForm(current => ({ ...current, name: event.target.value }))} />
-            </div>
-            <div className="col-md-6">
-              <label className="form-label">Username</label>
-              <input className="form-control" value={createForm.username} onChange={event => setCreateForm(current => ({ ...current, username: event.target.value }))} />
-            </div>
-            <div className="col-md-6">
-              <label className="form-label">Email</label>
-              <input className="form-control" value={createForm.email} onChange={event => setCreateForm(current => ({ ...current, email: event.target.value }))} />
-            </div>
-            <div className="col-md-6">
-              <label className="form-label">Temporary Password</label>
-              <input type="password" className="form-control" value={createForm.password} onChange={event => setCreateForm(current => ({ ...current, password: event.target.value }))} />
-            </div>
-            <div className="col-md-6">
-              <label className="form-label">Manager Email</label>
-              <input className="form-control" value={createForm.manager_email} onChange={event => setCreateForm(current => ({ ...current, manager_email: event.target.value }))} />
-            </div>
-            <div className="col-md-6">
-              <label className="form-label">Role</label>
-              <select className="form-select" value={createForm.role} onChange={event => setCreateForm(current => ({ ...current, role: event.target.value }))}>
-                <option value="EMPLOYEE">EMPLOYEE</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
-            </div>
-            <div className="col-12 d-flex gap-2 mt-2">
-              <button className="btn btn-brand">Create Employee</button>
-              <button type="button" className="btn btn-outline-secondary" onClick={closeForm}>Cancel</button>
-            </div>
-          </form>
-          )}
         </div>
-      ) : null}
+
+        {formVisible ? (
+          <div className="content-card sticky-card">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h2 className="section-title mb-1">{editing ? "Edit Employee" : "Create Employee"}</h2>
+                <p className="text-muted mb-0">
+                  {editing ? "Update employee access, status, or password." : "Create a new employee account with admin-only access control."}
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline-secondary btn-sm rounded-pill" onClick={closeForm}>
+                Close
+              </button>
+            </div>
+
+            {error ? <div className="alert alert-danger py-2">{error}</div> : null}
+
+            {editing ? (
+              <form onSubmit={submitUpdate}>
+                <div className="row g-3">
+                  <div className="col-md-6">
+                    <label className="form-label">Name</label>
+                    <input className="form-control" value={editing.name} onChange={event => setEditing(current => ({ ...current, name: event.target.value }))} />
+                  </div>
+                  <div className="col-md-6">
+                    <label className="form-label">Email</label>
+                    <input className="form-control" value={editing.email} onChange={event => setEditing(current => ({ ...current, email: event.target.value }))} />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">Role</label>
+                    <select className="form-select" value={editing.role} onChange={event => setEditing(current => ({ ...current, role: event.target.value }))}>
+                      <option value="EMPLOYEE">EMPLOYEE</option>
+                      <option value="ADMIN">ADMIN</option>
+                    </select>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">Status</label>
+                    <select className="form-select" value={String(editing.is_active)} onChange={event => setEditing(current => ({ ...current, is_active: event.target.value === "true" }))}>
+                      <option value="true">Active</option>
+                      <option value="false">Disabled</option>
+                    </select>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="form-label">New Password</label>
+                    <input type="password" className="form-control" value={editing.password} onChange={event => setEditing(current => ({ ...current, password: event.target.value }))} />
+                  </div>
+                </div>
+
+                <div className="d-flex gap-2 mt-4">
+                  <button className="btn btn-brand">Update</button>
+                  {editing.is_active ? (
+                    <button type="button" className="btn btn-outline-warning" onClick={() => disableEmployee(editing)}>
+                      Disable
+                    </button>
+                  ) : null}
+                  <button type="button" className="btn btn-outline-secondary" onClick={closeForm}>Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={submitCreate} className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">Name</label>
+                  <input className="form-control" value={createForm.name} onChange={event => setCreateForm(current => ({ ...current, name: event.target.value }))} />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Username</label>
+                  <input className="form-control" value={createForm.username} onChange={event => setCreateForm(current => ({ ...current, username: event.target.value }))} />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Email</label>
+                  <input className="form-control" value={createForm.email} onChange={event => setCreateForm(current => ({ ...current, email: event.target.value }))} />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Temporary Password</label>
+                  <input type="password" className="form-control" value={createForm.password} onChange={event => setCreateForm(current => ({ ...current, password: event.target.value }))} />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Manager Email</label>
+                  <input className="form-control" value={createForm.manager_email} onChange={event => setCreateForm(current => ({ ...current, manager_email: event.target.value }))} />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Role</label>
+                  <select className="form-select" value={createForm.role} onChange={event => setCreateForm(current => ({ ...current, role: event.target.value }))}>
+                    <option value="EMPLOYEE">EMPLOYEE</option>
+                    <option value="ADMIN">ADMIN</option>
+                  </select>
+                </div>
+                <div className="col-12 d-flex gap-2 mt-2">
+                  <button className="btn btn-brand">Create Employee</button>
+                  <button type="button" className="btn btn-outline-secondary" onClick={closeForm}>Cancel</button>
+                </div>
+              </form>
+            )}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
