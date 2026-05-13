@@ -8,7 +8,7 @@ import EmployeesPage from "./pages/EmployeesPage";
 import PayrollPage from "./pages/PayrollPage";
 import LoginTimePage from "./pages/LoginTimePage";
 import PlaceholderPage from "./pages/PlaceholderPage";
-
+import Testing from "./pages/Testing";
 export default function App() {
   return (
     <Routes>
@@ -33,12 +33,24 @@ export default function App() {
           }
         />
         <Route path="payroll" element={<PayrollPage />} />
-        <Route path="upload-works" element={<PlaceholderPage title="Upload Works" />} />
-        <Route path="performance" element={<PlaceholderPage title="Performance" />} />
-        <Route path="schedules" element={<PlaceholderPage title="Schedules" />} />
+        <Route path="upload-works" element={<Testing title="Upload Works" />} />
+        <Route
+          path="performance"
+          element={<PlaceholderPage title="Performance" />}
+        />
+        <Route
+          path="schedules"
+          element={<PlaceholderPage title="Schedules" />}
+        />
         <Route path="messages" element={<PlaceholderPage title="Messages" />} />
-        <Route path="notifications" element={<PlaceholderPage title="Notifications" />} />
-        <Route path="dump-files" element={<PlaceholderPage title="Dump Files" />} />
+        <Route
+          path="notifications"
+          element={<PlaceholderPage title="Notifications" />}
+        />
+        <Route
+          path="dump-files"
+          element={<PlaceholderPage title="Dump Files" />}
+        />
       </Route>
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>

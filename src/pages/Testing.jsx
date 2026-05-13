@@ -1,7 +1,6 @@
 import { Fragment, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { apiRequest, withAuth } from "../lib/api";
-import "./PayrollPage.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-IN", {
   style: "currency",
@@ -176,7 +175,7 @@ function escapeCsvCell(value) {
     : stringValue;
 }
 
-function buildPayslipHtml(row, shouldPrint = false) {
+function buildPayslipHtml(row) {
   const employeeLabel = row.employeeCode ? `${row.employeeName} (${row.employeeCode})` : row.employeeName;
   return `<!DOCTYPE html>
 <html lang="en">
@@ -229,15 +228,6 @@ function buildPayslipHtml(row, shouldPrint = false) {
       </tbody>
     </table>
   </div>
-  ${shouldPrint ? `
-  <script>
-    window.addEventListener('load', function () {
-      window.focus();
-      setTimeout(function () {
-        window.print();
-      }, 250);
-    });
-  </script>` : ""}
 </body>
 </html>`;
 }
@@ -258,7 +248,6 @@ export default function PayrollPage() {
   const [departmentFilter, setDepartmentFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedRowKey, setExpandedRowKey] = useState("");
-  const [adminSection, setAdminSection] = useState("snapshot");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -474,13 +463,15 @@ export default function PayrollPage() {
   };
 
   const openPayslip = (row, shouldPrint = false) => {
-    const html = buildPayslipHtml(row, shouldPrint);
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const popup = window.open(url, "_blank", "width=1024,height=860");
+    const popup = window.open("", "_blank", "noopener,noreferrer,width=1024,height=860");
     if (!popup) return;
-    popup.addEventListener?.("beforeunload", () => URL.revokeObjectURL(url), { once: true });
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    popup.document.open();
+    popup.document.write(buildPayslipHtml(row));
+    popup.document.close();
+    if (shouldPrint) {
+      popup.focus();
+      popup.print();
+    }
   };
 
   const renderAmountCell = row => (
@@ -496,17 +487,6 @@ export default function PayrollPage() {
 
   const renderBreakdownPanel = row => (
     <div className="payroll-breakdown-shell">
-      <div className="payroll-breakdown-head">
-        <div>
-          <div className="payroll-breakdown-title">Salary Breakdown</div>
-          <div className="payroll-breakdown-subtitle">
-            {row.employeeName}{row.employeeCode ? ` (${row.employeeCode})` : ""} • {row.monthLabel}
-          </div>
-        </div>
-        <div className="payroll-breakdown-formula">
-          Payable Days = Present + Paid Leave + Holidays
-        </div>
-      </div>
       <div className="payroll-breakdown-grid">
         <div className="payroll-breakdown-item">
           <span>Monthly Salary</span>
@@ -570,389 +550,363 @@ export default function PayrollPage() {
       </section>
 
       {isAdmin ? (
-        <div className="page-stack">
-            <div className="payroll-admin-nav payroll-admin-nav-inline">
-              <button
-                className={`payroll-admin-tab ${adminSection === "snapshot" ? "active" : ""}`}
-                onClick={() => setAdminSection("snapshot")}
-              >
-                Snapshot
-              </button>
-              <button
-                className={`payroll-admin-tab ${adminSection === "holidays" ? "active" : ""}`}
-                onClick={() => setAdminSection("holidays")}
-              >
-                Holidays
-              </button>
-              <button
-                className={`payroll-admin-tab ${adminSection === "history" ? "active" : ""}`}
-                onClick={() => setAdminSection("history")}
-              >
-                History
-              </button>
-            </div>
-
-            {adminSection === "snapshot" ? (
-              <div className="content-card payroll-summary-sticky">
-                <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-2">
-                  <div className="payroll-summary-header">
-                    <h2 className="section-title mb-1">Payroll Summary</h2>
-                    <p className="text-muted mb-0">
-                      Payable Days = Present + Paid Leave + Public Holidays. Total Working Days = Payable Days + LOP Days.
-                    </p>
-                  </div>
+        <div className="page-grid">
+          <div className="page-stack">
+            <div className="content-card payroll-summary-sticky">
+              <div className="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                  <h2 className="section-title mb-1">Payroll Summary</h2>
+                  <p className="text-muted mb-0">
+                    Payable Days = Present + Paid Leave + Public Holidays. Total Working Days = Payable Days + LOP Days.
+                  </p>
                 </div>
-
-                <div className="payroll-chip-row payroll-chip-row-tight mb-2">
+                <div className="payroll-chip-row">
                   <span className="payroll-chip">Month: {formatMonthLabel(month)}</span>
                   <span className="payroll-chip">Paid Holidays: {formatCount(previewMeta.paidHolidayCount)}</span>
                   <span className="payroll-chip">Paid Sick Leave Allowance: {formatCount(previewMeta.sickLeaveAllowance)}</span>
                   {previewMeta.effectiveEnd ? <span className="payroll-chip">Calculated Till: {formatDisplayDate(previewMeta.effectiveEnd)}</span> : null}
                 </div>
-
-                {error ? <div className="alert alert-danger py-2">{error}</div> : null}
-
-                <div className="soft-panel payroll-filter-panel mt-2 mb-2">
-                  <div className="row g-3">
-                    <div className="col-lg-4">
-                      <label className="form-label">Employee Search</label>
-                      <input
-                        className="form-control"
-                        placeholder="Search by employee, code, or month"
-                        value={employeeSearch}
-                        onChange={event => setEmployeeSearch(event.target.value)}
-                      />
-                    </div>
-                    <div className="col-lg-3">
-                      <label className="form-label">Department</label>
-                      <select className="form-select" value={departmentFilter} onChange={event => setDepartmentFilter(event.target.value)}>
-                        <option value="">All Departments</option>
-                        {previewDepartments.map(department => (
-                          <option key={department} value={department}>{department}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-lg-3">
-                      <label className="form-label">Payroll Status</label>
-                      <select className="form-select" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
-                        <option value="">All Statuses</option>
-                        {statusOptions.map(status => (
-                          <option key={status} value={status}>{status}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-lg-2">
-                      <label className="form-label">Payroll Month</label>
-                      <input type="month" className="form-control" value={month} onChange={event => setMonth(event.target.value)} />
-                      <div className="small text-muted mt-1">{formatMonthLabel(month)}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="stats-grid payroll-stats-grid">
-                  <div className="stat-box stat-box-emphasis">
-                    <div className="stat-label">Payable Amount</div>
-                    <div className="stat-value">{formatCurrency(summary.amount)}</div>
-                  </div>
-                  <div className="stat-box">
-                    <div className="stat-label">Total Working Days</div>
-                    <div className="stat-value">{formatCount(summary.totalWorkingDays)}</div>
-                  </div>
-                  <div className="stat-box stat-box-positive">
-                    <div className="stat-label">Payable Days</div>
-                    <div className="stat-value text-success">{formatCount(summary.payableDays)}</div>
-                  </div>
-                  <div className="stat-box stat-box-danger">
-                    <div className="stat-label">LOP Days</div>
-                    <div className="stat-value text-danger">{formatCount(summary.lopDays)}</div>
-                  </div>
-                  <div className="stat-box">
-                    <div className="stat-label">Public Holidays</div>
-                    <div className="stat-value">{formatCount(summary.holidays)}</div>
-                  </div>
-                </div>
-
-                {previewIssues.length ? (
-                  <div className="alert alert-light payroll-alert mt-4 mb-0">
-                    <strong>{previewIssues.length}</strong> payroll row{previewIssues.length > 1 ? "s need" : " needs"} attention due to zero pay, high LOP, or validation corrections.
-                  </div>
-                ) : null}
               </div>
-            ) : null}
+
+              {error ? <div className="alert alert-danger py-2">{error}</div> : null}
+
+              <div className="stats-grid payroll-stats-grid">
+                <div className="stat-box stat-box-emphasis">
+                  <div className="stat-label">Payable Amount</div>
+                  <div className="stat-value">{formatCurrency(summary.amount)}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Total Working Days</div>
+                  <div className="stat-value">{formatCount(summary.totalWorkingDays)}</div>
+                </div>
+                <div className="stat-box stat-box-positive">
+                  <div className="stat-label">Payable Days</div>
+                  <div className="stat-value text-success">{formatCount(summary.payableDays)}</div>
+                </div>
+                <div className="stat-box stat-box-danger">
+                  <div className="stat-label">LOP Days</div>
+                  <div className="stat-value text-danger">{formatCount(summary.lopDays)}</div>
+                </div>
+                <div className="stat-box">
+                  <div className="stat-label">Public Holidays</div>
+                  <div className="stat-value">{formatCount(summary.holidays)}</div>
+                </div>
+              </div>
+
+              <div className="soft-panel payroll-filter-panel mt-4">
+                <div className="row g-3">
+                  <div className="col-lg-4">
+                    <label className="form-label">Employee Search</label>
+                    <input
+                      className="form-control"
+                      placeholder="Search by employee, code, or month"
+                      value={employeeSearch}
+                      onChange={event => setEmployeeSearch(event.target.value)}
+                    />
+                  </div>
+                  <div className="col-lg-3">
+                    <label className="form-label">Department</label>
+                    <select className="form-select" value={departmentFilter} onChange={event => setDepartmentFilter(event.target.value)}>
+                      <option value="">All Departments</option>
+                      {previewDepartments.map(department => (
+                        <option key={department} value={department}>{department}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-lg-3">
+                    <label className="form-label">Payroll Status</label>
+                    <select className="form-select" value={statusFilter} onChange={event => setStatusFilter(event.target.value)}>
+                      <option value="">All Statuses</option>
+                      {statusOptions.map(status => (
+                        <option key={status} value={status}>{status}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-lg-2">
+                    <label className="form-label">Payroll Month</label>
+                    <input type="month" className="form-control" value={month} onChange={event => setMonth(event.target.value)} />
+                    <div className="small text-muted mt-1">{formatMonthLabel(month)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {previewIssues.length ? (
+                <div className="alert alert-light payroll-alert mt-4 mb-0">
+                  <strong>{previewIssues.length}</strong> payroll row{previewIssues.length > 1 ? "s need" : " needs"} attention due to zero pay, high LOP, or validation corrections.
+                </div>
+              ) : null}
+            </div>
 
             <div className="content-card">
-              {adminSection === "snapshot" ? (
-                <>
-                  <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
-                    <div>
-                      <h2 className="section-title mb-1">Payroll Snapshot Table</h2>
-                      <p className="text-muted mb-0">Expand any row to inspect salary math before payroll is finalized.</p>
-                    </div>
-                    <span className="payroll-chip">{previewDisplayRows.length} row{previewDisplayRows.length === 1 ? "" : "s"} in view</span>
-                  </div>
+              <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+                <div>
+                  <h2 className="section-title mb-1">Payroll Snapshot Table</h2>
+                  <p className="text-muted mb-0">Expand any row to inspect salary math before payroll is finalized.</p>
+                </div>
+                <span className="payroll-chip">{previewDisplayRows.length} row{previewDisplayRows.length === 1 ? "" : "s"} in view</span>
+              </div>
 
-                  <div className="table-responsive payroll-table-shell d-none d-lg-block">
-                    <table className="table payroll-table align-middle">
-                      <thead>
-                        <tr>
-                          <th>Employee</th>
-                          <th>Department</th>
-                          <th>Status</th>
-                          <th>Present</th>
-                          <th>Holiday</th>
-                          <th>Sick Leave</th>
-                          <th>Paid Sick</th>
-                          <th>Total Working</th>
-                          <th>LOP</th>
-                          <th>Payable Days</th>
-                          <th>Amount</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {previewDisplayRows.length ? previewDisplayRows.map(row => (
-                          <Fragment key={row.key}>
-                            <tr
-                              className={[
-                                "payroll-row",
-                                row.payableAmount <= 0 ? "payroll-row-muted" : "",
-                                row.hasValidationIssue ? "payroll-row-warning" : ""
-                              ].filter(Boolean).join(" ")}
-                            >
-                              <td>
-                                <div className="fw-semibold">{row.employeeName}</div>
-                                <div className="small text-muted">{row.employeeCode || row.monthLabel}</div>
-                              </td>
-                              <td>{row.department}</td>
-                              <td><span className={`payroll-badge tone-${row.statusTone}`}>{row.statusLabel}</span></td>
-                              <td>{formatCount(row.presentDays)}</td>
-                              <td>{formatCount(row.holidayDays)}</td>
-                              <td>{formatCount(row.sickLeaveDays)}</td>
-                              <td>{formatCount(row.paidSickLeaveDays)}</td>
-                              <td>{formatCount(row.totalWorkingDays)}</td>
-                              <td className="text-danger fw-semibold">{formatCount(row.lopDays)}</td>
-                              <td className="text-success fw-semibold">{formatCount(row.payableDays)}</td>
-                              <td>{renderAmountCell(row)}</td>
-                              <td>
-                                <div className="d-flex gap-2 flex-wrap">
-                                  <button className="btn btn-sm btn-outline-primary" onClick={() => setExpandedRowKey(current => current === row.key ? "" : row.key)}>
-                                    {expandedRowKey === row.key ? "Hide" : "Breakdown"}
-                                  </button>
-                                  <button className="btn btn-sm btn-outline-secondary" onClick={() => openPayslip(row, false)}>Preview</button>
-                                  <button className="btn btn-sm btn-brand" onClick={() => openPayslip(row, true)}>PDF</button>
-                                </div>
-                              </td>
-                            </tr>
-                            {expandedRowKey === row.key ? (
-                              <tr className="payroll-detail-row">
-                                <td colSpan={12}>{renderBreakdownPanel(row)}</td>
-                              </tr>
-                            ) : null}
-                          </Fragment>
-                        )) : (
-                          <tr>
-                            <td colSpan={12} className="text-center text-muted py-4">No payroll data available for the current filters.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                      {previewDisplayRows.length ? (
-                        <tfoot>
-                          <tr className="payroll-totals-row">
-                            <td>Total</td>
-                            <td>-</td>
-                            <td>-</td>
-                            <td>{formatCount(summary.presentDays)}</td>
-                            <td>{formatCount(summary.holidays)}</td>
-                            <td>{formatCount(summary.sickLeaveDays)}</td>
-                            <td>{formatCount(summary.paidSickLeaveDays)}</td>
-                            <td>{formatCount(summary.totalWorkingDays)}</td>
-                            <td className="text-danger">{formatCount(summary.lopDays)}</td>
-                            <td className="text-success">{formatCount(summary.payableDays)}</td>
-                            <td>{formatCurrency(summary.amount)}</td>
-                            <td>Sticky Total</td>
-                          </tr>
-                        </tfoot>
-                      ) : null}
-                    </table>
-                  </div>
-
-                  <div className="payroll-mobile-list d-lg-none">
+              <div className="table-responsive payroll-table-shell d-none d-lg-block">
+                <table className="table payroll-table align-middle">
+                  <thead>
+                    <tr>
+                      <th>Employee</th>
+                      <th>Department</th>
+                      <th>Status</th>
+                      <th>Present</th>
+                      <th>Holiday</th>
+                      <th>Sick Leave</th>
+                      <th>Paid Sick</th>
+                      <th>Total Working</th>
+                      <th>LOP</th>
+                      <th>Payable Days</th>
+                      <th>Amount</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {previewDisplayRows.length ? previewDisplayRows.map(row => (
-                      <article
-                        key={`${row.key}-mobile`}
+                      <Fragment key={row.key}>
+                        <tr
+                          className={[
+                            "payroll-row",
+                            row.payableAmount <= 0 ? "payroll-row-muted" : "",
+                            row.hasValidationIssue ? "payroll-row-warning" : ""
+                          ].filter(Boolean).join(" ")}
+                        >
+                          <td>
+                            <div className="fw-semibold">{row.employeeName}</div>
+                            <div className="small text-muted">{row.employeeCode || row.monthLabel}</div>
+                          </td>
+                          <td>{row.department}</td>
+                          <td><span className={`payroll-badge tone-${row.statusTone}`}>{row.statusLabel}</span></td>
+                          <td>{formatCount(row.presentDays)}</td>
+                          <td>{formatCount(row.holidayDays)}</td>
+                          <td>{formatCount(row.sickLeaveDays)}</td>
+                          <td>{formatCount(row.paidSickLeaveDays)}</td>
+                          <td>{formatCount(row.totalWorkingDays)}</td>
+                          <td className="text-danger fw-semibold">{formatCount(row.lopDays)}</td>
+                          <td className="text-success fw-semibold">{formatCount(row.payableDays)}</td>
+                          <td>{renderAmountCell(row)}</td>
+                          <td>
+                            <div className="d-flex gap-2 flex-wrap">
+                              <button className="btn btn-sm btn-outline-primary" onClick={() => setExpandedRowKey(current => current === row.key ? "" : row.key)}>
+                                {expandedRowKey === row.key ? "Hide" : "Breakdown"}
+                              </button>
+                              <button className="btn btn-sm btn-outline-secondary" onClick={() => openPayslip(row, false)}>Preview</button>
+                              <button className="btn btn-sm btn-brand" onClick={() => openPayslip(row, true)}>PDF</button>
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedRowKey === row.key ? (
+                          <tr className="payroll-detail-row">
+                            <td colSpan={12}>{renderBreakdownPanel(row)}</td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    )) : (
+                      <tr>
+                        <td colSpan={12} className="text-center text-muted py-4">No payroll data available for the current filters.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                  {previewDisplayRows.length ? (
+                    <tfoot>
+                      <tr className="payroll-totals-row">
+                        <td>Total</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>{formatCount(summary.presentDays)}</td>
+                        <td>{formatCount(summary.holidays)}</td>
+                        <td>{formatCount(summary.sickLeaveDays)}</td>
+                        <td>{formatCount(summary.paidSickLeaveDays)}</td>
+                        <td>{formatCount(summary.totalWorkingDays)}</td>
+                        <td className="text-danger">{formatCount(summary.lopDays)}</td>
+                        <td className="text-success">{formatCount(summary.payableDays)}</td>
+                        <td>{formatCurrency(summary.amount)}</td>
+                        <td>Sticky Total</td>
+                      </tr>
+                    </tfoot>
+                  ) : null}
+                </table>
+              </div>
+
+              <div className="payroll-mobile-list d-lg-none">
+                {previewDisplayRows.length ? previewDisplayRows.map(row => (
+                  <article
+                    key={`${row.key}-mobile`}
+                    className={[
+                      "payroll-mobile-card",
+                      row.payableAmount <= 0 ? "payroll-row-muted" : "",
+                      row.hasValidationIssue ? "payroll-row-warning" : ""
+                    ].filter(Boolean).join(" ")}
+                  >
+                    <div className="d-flex justify-content-between align-items-start gap-3 mb-3">
+                      <div>
+                        <h3 className="h6 mb-1">{row.employeeName}</h3>
+                        <div className="small text-muted">{row.employeeCode || row.monthLabel}</div>
+                        <div className="small text-muted">{row.department}</div>
+                      </div>
+                      <span className={`payroll-badge tone-${row.statusTone}`}>{row.statusLabel}</span>
+                    </div>
+                    <div className="payroll-mobile-metrics">
+                      <div><span>Present</span><strong>{formatCount(row.presentDays)}</strong></div>
+                      <div><span>Holiday</span><strong>{formatCount(row.holidayDays)}</strong></div>
+                      <div><span>Paid Sick</span><strong>{formatCount(row.paidSickLeaveDays)}</strong></div>
+                      <div><span>LOP</span><strong className="text-danger">{formatCount(row.lopDays)}</strong></div>
+                      <div><span>Payable Days</span><strong className="text-success">{formatCount(row.payableDays)}</strong></div>
+                      <div><span>Amount</span><strong>{row.payableAmount <= 0 ? "No Pay" : formatCurrency(row.payableAmount)}</strong></div>
+                    </div>
+                    <div className="mt-3">{renderBreakdownPanel(row)}</div>
+                    <div className="d-flex gap-2 flex-wrap mt-3">
+                      <button className="btn btn-sm btn-outline-secondary" onClick={() => openPayslip(row, false)}>Preview</button>
+                      <button className="btn btn-sm btn-brand" onClick={() => openPayslip(row, true)}>PDF</button>
+                    </div>
+                  </article>
+                )) : <div className="empty-state">No payroll data available for the current filters.</div>}
+              </div>
+            </div>
+
+            <div className="content-card">
+              <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+                <div>
+                  <h2 className="section-title mb-1">Payroll History</h2>
+                  <p className="text-muted mb-0">Review finalized records with the same validation and payroll status cues.</p>
+                </div>
+                <span className="payroll-chip">History Month: {formatMonthLabel(historyMonth)}</span>
+              </div>
+
+              <div className="row g-3 mb-3">
+                <div className="col-md-4">
+                  <label className="form-label">History Month</label>
+                  <input type="month" className="form-control" value={historyMonth} onChange={event => setHistoryMonth(event.target.value)} />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Employee</label>
+                  <select className="form-select" value={employeeId} onChange={event => setEmployeeId(event.target.value)}>
+                    <option value="">All Employees</option>
+                    {employees.map(employee => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.name}{employee.employee_code ? ` (${employee.employee_code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Search in History</label>
+                  <input
+                    className="form-control"
+                    placeholder="Reuse top search and filters instantly"
+                    value={employeeSearch}
+                    onChange={event => setEmployeeSearch(event.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="table-responsive payroll-table-shell">
+                <table className="table payroll-table align-middle">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th>Employee</th>
+                      <th>Department</th>
+                      <th>Status</th>
+                      <th>Monthly Salary</th>
+                      <th>Payable Days</th>
+                      <th>LOP</th>
+                      <th>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyDisplayRows.length ? historyDisplayRows.map(row => (
+                      <tr
+                        key={row.key}
                         className={[
-                          "payroll-mobile-card",
                           row.payableAmount <= 0 ? "payroll-row-muted" : "",
                           row.hasValidationIssue ? "payroll-row-warning" : ""
                         ].filter(Boolean).join(" ")}
                       >
-                        <div className="d-flex justify-content-between align-items-start gap-3 mb-3">
-                          <div>
-                            <h3 className="h6 mb-1">{row.employeeName}</h3>
-                            <div className="small text-muted">{row.employeeCode || row.monthLabel}</div>
-                            <div className="small text-muted">{row.department}</div>
-                          </div>
-                          <span className={`payroll-badge tone-${row.statusTone}`}>{row.statusLabel}</span>
-                        </div>
-                        <div className="payroll-mobile-metrics">
-                          <div><span>Present</span><strong>{formatCount(row.presentDays)}</strong></div>
-                          <div><span>Holiday</span><strong>{formatCount(row.holidayDays)}</strong></div>
-                          <div><span>Paid Sick</span><strong>{formatCount(row.paidSickLeaveDays)}</strong></div>
-                          <div><span>LOP</span><strong className="text-danger">{formatCount(row.lopDays)}</strong></div>
-                          <div><span>Payable Days</span><strong className="text-success">{formatCount(row.payableDays)}</strong></div>
-                          <div><span>Amount</span><strong>{row.payableAmount <= 0 ? "No Pay" : formatCurrency(row.payableAmount)}</strong></div>
-                        </div>
-                        <div className="mt-3">{renderBreakdownPanel(row)}</div>
-                        <div className="d-flex gap-2 flex-wrap mt-3">
-                          <button className="btn btn-sm btn-outline-secondary" onClick={() => openPayslip(row, false)}>Preview</button>
-                          <button className="btn btn-sm btn-brand" onClick={() => openPayslip(row, true)}>PDF</button>
-                        </div>
-                      </article>
-                    )) : <div className="empty-state">No payroll data available for the current filters.</div>}
-                  </div>
-                </>
-              ) : null}
-
-              {adminSection === "holidays" ? (
-                <div className="payroll-section-grid payroll-section-grid-wide">
-                  <form onSubmit={addHoliday} className="soft-panel">
-                    <h2 className="section-title mb-2">Create Holiday</h2>
-                    <p className="text-muted mb-3">Add paid or unpaid public holidays for the selected payroll month.</p>
-                    <div className="mb-3">
-                      <label className="form-label">Date</label>
-                      <input
-                        type="date"
-                        className="form-control"
-                        value={holidayForm.holiday_date}
-                        onChange={event => setHolidayForm(current => ({ ...current, holiday_date: event.target.value }))}
-                      />
-                    </div>
-                    <div className="mb-3">
-                      <label className="form-label">Title</label>
-                      <input
-                        className="form-control"
-                        value={holidayForm.title}
-                        onChange={event => setHolidayForm(current => ({ ...current, title: event.target.value }))}
-                      />
-                    </div>
-                    <div className="form-check mb-3">
-                      <input
-                        id="paidHoliday"
-                        className="form-check-input"
-                        type="checkbox"
-                        checked={holidayForm.is_paid}
-                        onChange={event => setHolidayForm(current => ({ ...current, is_paid: event.target.checked }))}
-                      />
-                      <label htmlFor="paidHoliday" className="form-check-label">Paid holiday</label>
-                    </div>
-                    <button className="btn btn-outline-primary">Add Holiday</button>
-                  </form>
-
-                  <div className="soft-panel">
-                    <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
-                      <div>
-                        <h2 className="section-title mb-1">Current Month Holidays</h2>
-                        <p className="text-muted mb-0">Review and remove holidays without leaving payroll.</p>
-                      </div>
-                      <span className="payroll-chip">{holidays.length} holiday{holidays.length === 1 ? "" : "s"}</span>
-                    </div>
-                    <div className="d-grid gap-2">
-                      {holidays.length ? holidays.map(holiday => (
-                        <div key={holiday.id} className="border rounded p-3 d-flex justify-content-between align-items-start gap-3">
-                          <div>
-                            <div className="fw-semibold">{holiday.title}</div>
-                            <div className="small text-muted">
-                              {formatDisplayDate(holiday.holiday_date)} • {holiday.is_paid ? "Paid" : "Unpaid"}
-                            </div>
-                          </div>
-                          <button className="btn btn-sm btn-link text-danger" onClick={() => removeHoliday(holiday.id)}>Delete</button>
-                        </div>
-                      )) : <div className="small text-muted">No holidays added.</div>}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              {adminSection === "history" ? (
-                <>
-                  <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
-                    <div>
-                      <h2 className="section-title mb-1">Payroll History</h2>
-                      <p className="text-muted mb-0">Review finalized records with the same validation and payroll status cues.</p>
-                    </div>
-                    <span className="payroll-chip">History Month: {formatMonthLabel(historyMonth)}</span>
-                  </div>
-
-                  <div className="row g-3 mb-3">
-                    <div className="col-md-4">
-                      <label className="form-label">History Month</label>
-                      <input type="month" className="form-control" value={historyMonth} onChange={event => setHistoryMonth(event.target.value)} />
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Employee</label>
-                      <select className="form-select" value={employeeId} onChange={event => setEmployeeId(event.target.value)}>
-                        <option value="">All Employees</option>
-                        {employees.map(employee => (
-                          <option key={employee.id} value={employee.id}>
-                            {employee.name}{employee.employee_code ? ` (${employee.employee_code})` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="form-label">Search in History</label>
-                      <input
-                        className="form-control"
-                        placeholder="Reuse top search and filters instantly"
-                        value={employeeSearch}
-                        onChange={event => setEmployeeSearch(event.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="table-responsive payroll-table-shell">
-                    <table className="table payroll-table align-middle">
-                      <thead>
-                        <tr>
-                          <th>Month</th>
-                          <th>Employee</th>
-                          <th>Department</th>
-                          <th>Status</th>
-                          <th>Monthly Salary</th>
-                          <th>Payable Days</th>
-                          <th>LOP</th>
-                          <th>Amount</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {historyDisplayRows.length ? historyDisplayRows.map(row => (
-                          <tr
-                            key={row.key}
-                            className={[
-                              row.payableAmount <= 0 ? "payroll-row-muted" : "",
-                              row.hasValidationIssue ? "payroll-row-warning" : ""
-                            ].filter(Boolean).join(" ")}
-                          >
-                            <td>{row.monthLabel}</td>
-                            <td>{row.employeeName}{row.employeeCode ? ` (${row.employeeCode})` : ""}</td>
-                            <td>{row.department}</td>
-                            <td><span className={`payroll-badge tone-${row.statusTone}`}>{row.statusLabel}</span></td>
-                            <td>{formatCurrency(row.baseSalary)}</td>
-                            <td className="text-success fw-semibold">{formatCount(row.payableDays)}</td>
-                            <td className="text-danger fw-semibold">{formatCount(row.lopDays)}</td>
-                            <td>{renderAmountCell(row)}</td>
-                          </tr>
-                        )) : (
-                          <tr>
-                            <td colSpan={8} className="text-center text-muted py-4">No payroll history found for the current filters.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              ) : null}
+                        <td>{row.monthLabel}</td>
+                        <td>{row.employeeName}{row.employeeCode ? ` (${row.employeeCode})` : ""}</td>
+                        <td>{row.department}</td>
+                        <td><span className={`payroll-badge tone-${row.statusTone}`}>{row.statusLabel}</span></td>
+                        <td>{formatCurrency(row.baseSalary)}</td>
+                        <td className="text-success fw-semibold">{formatCount(row.payableDays)}</td>
+                        <td className="text-danger fw-semibold">{formatCount(row.lopDays)}</td>
+                        <td>{renderAmountCell(row)}</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={8} className="text-center text-muted py-4">No payroll history found for the current filters.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
+          </div>
+
+          <aside className="content-card sticky-card">
+            <h2 className="section-title">Payroll Controls</h2>
+            <div className="soft-panel mb-4">
+              <div className="mb-3">
+                <label className="form-label">Payroll Month</label>
+                <input type="month" className="form-control" value={month} onChange={event => setMonth(event.target.value)} />
+                <div className="small text-muted mt-1">Selected month: {formatMonthLabel(month)}</div>
+              </div>
+              <div className="d-flex gap-2 flex-wrap">
+                <button className="btn btn-outline-primary" onClick={loadPreview}>Preview Payroll</button>
+                <button className="btn btn-brand" onClick={generatePayroll}>Finalize Payroll</button>
+              </div>
+            </div>
+
+            <h3 className="h6 fw-bold mb-3">Public Holidays</h3>
+            <form onSubmit={addHoliday} className="soft-panel mb-3">
+              <div className="mb-3">
+                <label className="form-label">Date</label>
+                <input
+                  type="date"
+                  className="form-control"
+                  value={holidayForm.holiday_date}
+                  onChange={event => setHolidayForm(current => ({ ...current, holiday_date: event.target.value }))}
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label">Title</label>
+                <input
+                  className="form-control"
+                  value={holidayForm.title}
+                  onChange={event => setHolidayForm(current => ({ ...current, title: event.target.value }))}
+                />
+              </div>
+              <div className="form-check mb-3">
+                <input
+                  id="paidHoliday"
+                  className="form-check-input"
+                  type="checkbox"
+                  checked={holidayForm.is_paid}
+                  onChange={event => setHolidayForm(current => ({ ...current, is_paid: event.target.checked }))}
+                />
+                <label htmlFor="paidHoliday" className="form-check-label">Paid holiday</label>
+              </div>
+              <button className="btn btn-outline-primary">Add Holiday</button>
+            </form>
+
+            <div className="small text-muted">Current month holidays</div>
+            <div className="mt-2 d-grid gap-2">
+              {holidays.length ? holidays.map(holiday => (
+                <div key={holiday.id} className="border rounded p-3 d-flex justify-content-between align-items-start gap-3">
+                  <div>
+                    <div className="fw-semibold">{holiday.title}</div>
+                    <div className="small text-muted">
+                      {formatDisplayDate(holiday.holiday_date)} • {holiday.is_paid ? "Paid" : "Unpaid"}
+                    </div>
+                  </div>
+                  <button className="btn btn-sm btn-link text-danger" onClick={() => removeHoliday(holiday.id)}>Delete</button>
+                </div>
+              )) : <div className="small text-muted">No holidays added.</div>}
+            </div>
+          </aside>
         </div>
       ) : (
         <div className="content-card">
@@ -1022,3 +976,5 @@ export default function PayrollPage() {
     </div>
   );
 }
+
+
