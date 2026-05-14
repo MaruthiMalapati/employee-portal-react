@@ -80,6 +80,27 @@ function getStatusMeta(row) {
   return { label: "Ready", tone: "success" };
 }
 
+function getLopSeverity(row) {
+  if (!row || row.lopDays <= 0) {
+    return { label: "No LOP", tone: "success", message: "No loss of pay is recorded for this month." };
+  }
+
+  const highLopLimit = Math.max(3, row.totalWorkingDays * 0.25);
+  if (row.lopDays >= highLopLimit) {
+    return {
+      label: "High LOP",
+      tone: "danger",
+      message: `${formatCount(row.lopDays)} LOP day${row.lopDays === 1 ? "" : "s"} detected. Review attendance or contact HR if this does not look correct.`
+    };
+  }
+
+  return {
+    label: "LOP Applied",
+    tone: "warning",
+    message: `${formatCount(row.lopDays)} LOP day${row.lopDays === 1 ? "" : "s"} reduced this month's payable amount.`
+  };
+}
+
 function enhancePayrollRow(row, employeeDirectory = {}) {
   const employeeRef = employeeDirectory[row.employee_id] || {};
   const presentDays = roundToTwo(row.present_days);
@@ -169,6 +190,15 @@ function aggregateRows(rows) {
   });
 }
 
+function getEmployeeInfo(user, row) {
+  return [
+    { label: "Employee", value: row?.employeeName || user?.name || "Employee" },
+    { label: "Employee ID", value: row?.employeeCode || user?.employee_code || user?.employeeCode || "Not assigned" },
+    { label: "Department", value: row?.department || user?.role || "Unassigned" },
+    { label: "Payment Status", value: row?.generatedAt ? "Payslip finalized" : "Awaiting payroll finalization" }
+  ];
+}
+
 function escapeCsvCell(value) {
   const stringValue = String(value ?? "");
   return /[",\n]/.test(stringValue)
@@ -203,7 +233,7 @@ function buildPayslipHtml(row, shouldPrint = false) {
   <div class="sheet">
     <div class="hero">
       <h1>Payslip</h1>
-      <p>${employeeLabel} • ${row.monthLabel}</p>
+      <p>${employeeLabel} | ${row.monthLabel}</p>
     </div>
     <div class="grid">
       <div class="card"><div class="label">Monthly Salary</div><div class="value">${formatCurrency(row.baseSalary)}</div></div>
@@ -311,6 +341,10 @@ export default function PayrollPage() {
 
   const summary = aggregateRows(previewDisplayRows);
   const previewIssues = previewDisplayRows.filter(row => row.hasValidationIssue || row.payableAmount <= 0 || row.lopDays >= Math.max(3, row.totalWorkingDays * 0.25));
+  const employeeCurrentRow = !isAdmin ? previewDisplayRows[0] : null;
+  const employeeHistoryRows = !isAdmin ? historyDisplayRows : [];
+  const employeeLopSeverity = getLopSeverity(employeeCurrentRow);
+  const employeeInfo = getEmployeeInfo(user, employeeCurrentRow);
 
   const loadEmployees = async () => {
     try {
@@ -500,7 +534,7 @@ export default function PayrollPage() {
         <div>
           <div className="payroll-breakdown-title">Salary Breakdown</div>
           <div className="payroll-breakdown-subtitle">
-            {row.employeeName}{row.employeeCode ? ` (${row.employeeCode})` : ""} • {row.monthLabel}
+            {row.employeeName}{row.employeeCode ? ` (${row.employeeCode})` : ""} | {row.monthLabel}
           </div>
         </div>
         <div className="payroll-breakdown-formula">
@@ -955,8 +989,21 @@ export default function PayrollPage() {
             </div>
         </div>
       ) : (
+        <div className="page-stack">
         <div className="content-card">
           {error ? <div className="alert alert-danger py-2">{error}</div> : null}
+
+          <div className="d-flex justify-content-between align-items-end gap-3 flex-wrap mb-3">
+            <div>
+              <h2 className="section-title mb-1">My Payroll Summary</h2>
+              <p className="text-muted mb-0">Month-wise salary, attendance, LOP, and downloadable payslip details.</p>
+            </div>
+            <div className="employee-month-control">
+              <label className="form-label">Payroll Month</label>
+              <input type="month" className="form-control" value={month} onChange={event => setMonth(event.target.value)} />
+            </div>
+          </div>
+
           <div className="stats-grid payroll-stats-grid mb-4">
             <div className="stat-box stat-box-emphasis">
               <div className="stat-label">Payable Amount</div>
@@ -980,7 +1027,84 @@ export default function PayrollPage() {
             </div>
           </div>
 
-          <div className="table-responsive payroll-table-shell">
+          {employeeCurrentRow ? (
+            <div className={`employee-lop-alert tone-${employeeLopSeverity.tone}`}>
+              <div className="employee-lop-icon">
+                <i className={`bi ${employeeLopSeverity.tone === "success" ? "bi-check-circle" : "bi-exclamation-triangle"}`}></i>
+              </div>
+              <div>
+                <div className="fw-semibold">{employeeLopSeverity.label}</div>
+                <p className="mb-0">{employeeLopSeverity.message}</p>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="employee-payroll-grid mb-4">
+            <section className="soft-panel employee-info-panel">
+              <div className="d-flex justify-content-between align-items-start gap-3 mb-3">
+                <div>
+                  <h3 className="employee-panel-title">Employee Details</h3>
+                  <p className="text-muted mb-0">{formatMonthLabel(month)}</p>
+                </div>
+                {employeeCurrentRow ? <span className={`payroll-badge tone-${employeeCurrentRow.statusTone}`}>{employeeCurrentRow.statusLabel}</span> : null}
+              </div>
+              <div className="employee-info-list">
+                {employeeInfo.map(item => (
+                  <div key={item.label}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="soft-panel employee-attendance-panel">
+              <h3 className="employee-panel-title">Attendance Summary</h3>
+              {employeeCurrentRow ? (
+                <>
+                  <div className="employee-attendance-meter">
+                    <span style={{ width: `${employeeCurrentRow.totalWorkingDays ? Math.min(100, (employeeCurrentRow.payableDays / employeeCurrentRow.totalWorkingDays) * 100) : 0}%` }}></span>
+                  </div>
+                  <div className="employee-attendance-grid">
+                    <div><span>Present</span><strong>{formatCount(employeeCurrentRow.presentDays)}</strong></div>
+                    <div><span>Paid Leave</span><strong>{formatCount(employeeCurrentRow.paidSickLeaveDays)}</strong></div>
+                    <div><span>Holidays</span><strong>{formatCount(employeeCurrentRow.holidayDays)}</strong></div>
+                    <div><span>LOP</span><strong className="text-danger">{formatCount(employeeCurrentRow.lopDays)}</strong></div>
+                  </div>
+                  <p className="text-muted mb-0 small">
+                    Payable days are calculated from present days, paid sick leave, and paid public holidays.
+                  </p>
+                </>
+              ) : (
+                <div className="empty-state">No attendance payroll data available for {formatMonthLabel(month)}.</div>
+              )}
+            </section>
+          </div>
+
+          {employeeCurrentRow ? (
+            <div className="mb-4">
+              {renderBreakdownPanel(employeeCurrentRow)}
+            </div>
+          ) : null}
+
+          <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+            <div>
+              <h2 className="section-title mb-1">Payslip Records</h2>
+              <p className="text-muted mb-0">Preview the selected month or download a printable PDF copy.</p>
+            </div>
+            {employeeCurrentRow ? (
+              <div className="d-flex gap-2 flex-wrap">
+                <button className="btn btn-sm btn-outline-secondary" onClick={() => openPayslip(employeeCurrentRow, false)}>
+                  <i className="bi bi-eye me-1"></i> Preview
+                </button>
+                <button className="btn btn-sm btn-brand" onClick={() => openPayslip(employeeCurrentRow, true)}>
+                  <i className="bi bi-file-earmark-arrow-down me-1"></i> Download PDF
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="table-responsive payroll-table-shell d-none d-md-block">
             <table className="table payroll-table align-middle">
               <thead>
                 <tr>
@@ -1004,8 +1128,12 @@ export default function PayrollPage() {
                     <td>{renderAmountCell(row)}</td>
                     <td>
                       <div className="d-flex gap-2 flex-wrap">
-                        <button className="btn btn-sm btn-outline-secondary" onClick={() => openPayslip(row, false)}>Preview</button>
-                        <button className="btn btn-sm btn-brand" onClick={() => openPayslip(row, true)}>PDF</button>
+                        <button className="btn btn-sm btn-outline-secondary" onClick={() => openPayslip(row, false)}>
+                          <i className="bi bi-eye me-1"></i> Preview
+                        </button>
+                        <button className="btn btn-sm btn-brand" onClick={() => openPayslip(row, true)}>
+                          <i className="bi bi-file-earmark-arrow-down me-1"></i> Download PDF
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -1017,6 +1145,67 @@ export default function PayrollPage() {
               </tbody>
             </table>
           </div>
+
+          <div className="payroll-mobile-list d-md-none">
+            {previewDisplayRows.length ? previewDisplayRows.map(row => (
+              <article key={`${row.key}-employee-mobile`} className="payroll-mobile-card">
+                <div className="d-flex justify-content-between align-items-start gap-3 mb-3">
+                  <div>
+                    <h3 className="h6 mb-1">{row.monthLabel}</h3>
+                    <div className="small text-muted">{row.employeeName}</div>
+                  </div>
+                  <span className={`payroll-badge tone-${row.statusTone}`}>{row.statusLabel}</span>
+                </div>
+                <div className="payroll-mobile-metrics">
+                  <div><span>Total Working</span><strong>{formatCount(row.totalWorkingDays)}</strong></div>
+                  <div><span>LOP</span><strong className="text-danger">{formatCount(row.lopDays)}</strong></div>
+                  <div><span>Payable Days</span><strong className="text-success">{formatCount(row.payableDays)}</strong></div>
+                  <div><span>Amount</span><strong>{formatCurrency(row.payableAmount)}</strong></div>
+                </div>
+                <div className="d-flex gap-2 flex-wrap mt-3">
+                  <button className="btn btn-sm btn-outline-secondary" onClick={() => openPayslip(row, false)}>
+                    <i className="bi bi-eye me-1"></i> Preview
+                  </button>
+                  <button className="btn btn-sm btn-brand" onClick={() => openPayslip(row, true)}>
+                    <i className="bi bi-file-earmark-arrow-down me-1"></i> Download PDF
+                  </button>
+                </div>
+              </article>
+            )) : <div className="empty-state">No payroll data available.</div>}
+          </div>
+        </div>
+
+        <div className="content-card">
+          <div className="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3">
+            <div>
+              <h2 className="section-title mb-1">Recent Payslip History</h2>
+              <p className="text-muted mb-0">Use this to compare finalized payroll across months.</p>
+            </div>
+            <div className="employee-month-control">
+              <label className="form-label">History Month</label>
+              <input type="month" className="form-control" value={historyMonth} onChange={event => setHistoryMonth(event.target.value)} />
+            </div>
+          </div>
+
+          <div className="employee-history-grid">
+            {employeeHistoryRows.length ? employeeHistoryRows.map(row => (
+              <article key={`${row.key}-history`} className="employee-history-card">
+                <div className="d-flex justify-content-between align-items-start gap-3">
+                  <div>
+                    <h3>{row.monthLabel}</h3>
+                    <p>{row.statusLabel}</p>
+                  </div>
+                  <strong>{formatCurrency(row.payableAmount)}</strong>
+                </div>
+                <div className="employee-history-metrics">
+                  <span>Payable {formatCount(row.payableDays)}</span>
+                  <span>LOP {formatCount(row.lopDays)}</span>
+                  <span>Working {formatCount(row.totalWorkingDays)}</span>
+                </div>
+              </article>
+            )) : <div className="empty-state">No payroll history found for {formatMonthLabel(historyMonth)}.</div>}
+          </div>
+        </div>
         </div>
       )}
     </div>
