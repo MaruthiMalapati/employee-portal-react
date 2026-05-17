@@ -4,6 +4,9 @@ import { apiRequest, withAuth } from "../lib/api";
 import { useState } from "react";
 
 const navGroups = [
+  { to: "/dashboard/login-time", label: "Login Times", icon: "bi-stopwatch" },
+  { to: "/dashboard/tasks", label: "Daily Tasks", icon: "bi-list-task" },
+  { to: "/dashboard/payroll", label: "Payslips", icon: "bi-receipt" },
   {
     to: "/dashboard/employees",
     label: "Employees",
@@ -12,8 +15,6 @@ const navGroups = [
   },
   { to: "/dashboard/schedules", label: "Schedules", icon: "bi-calendar-week" },
   { to: "/dashboard/messages", label: "Messages", icon: "bi-chat-dots" },
-  { to: "/dashboard/login-time", label: "Login Times", icon: "bi-stopwatch" },
-  { to: "/dashboard/tasks", label: "Daily Tasks", icon: "bi-list-task" },
   { to: "/dashboard/upload-works", label: "Upload Works", icon: "bi-upload" },
   {
     to: "/dashboard/performance",
@@ -21,7 +22,6 @@ const navGroups = [
     icon: "bi-bar-chart-line",
   },
   { to: "/dashboard/notifications", label: "Notifications", icon: "bi-bell" },
-  { to: "/dashboard/payroll", label: "Payslips", icon: "bi-receipt" },
   { to: "/dashboard/dump-files", label: "Dump Files", icon: "bi-trash" },
 ];
 
@@ -62,7 +62,12 @@ export default function AppShell() {
           </button>
         </div>
 
-        <div className="sidebar-profile">
+        <NavLink
+          to="/dashboard"
+          className="sidebar-profile sidebar-profile-link"
+          onClick={() => setSidebarOpen(false)}
+          title="Go to dashboard"
+        >
           <div className="avatar-pill">{initials}</div>
           <div>
             <div className="fw-semibold">{user?.name || "Employee"}</div>
@@ -70,10 +75,10 @@ export default function AppShell() {
               {user?.role || "EMPLOYEE"}
             </div>
           </div>
-        </div>
+        </NavLink>
 
         <nav className="sidebar-nav">
-          {navGroups.map((group) => (
+          {navGroups.filter(group => !group.adminOnly || isAdmin).map((group) => (
             <div key={group.label} className="sidebar-group">
               {/* <div className="sidebar-group-label">{group.label}</div> */}
               <div className="sidebar-group-links">

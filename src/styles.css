@@ -99,6 +99,22 @@ body {
   padding-bottom: 10px;
 }
 
+.sidebar-profile-link {
+  margin: -4px -4px 2px;
+  padding: 4px 4px 10px;
+  border-radius: 14px;
+  color: #fff;
+  text-decoration: none;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.sidebar-profile-link:hover,
+.sidebar-profile-link:focus-visible {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
 .avatar-pill {
   width: 58px;
   height: 58px;

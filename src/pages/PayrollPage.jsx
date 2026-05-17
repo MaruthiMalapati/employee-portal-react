@@ -206,58 +206,192 @@ function escapeCsvCell(value) {
     : stringValue;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function buildPayslipHtml(row, shouldPrint = false) {
   const employeeLabel = row.employeeCode ? `${row.employeeName} (${row.employeeCode})` : row.employeeName;
+  const grossBeforeDeductions = roundToTwo(row.payableAmount + row.deductions);
+  const componentBase = grossBeforeDeductions || row.payableAmount || row.baseSalary;
+  const basicPay = roundToTwo(componentBase * 0.5);
+  const hra = roundToTwo(componentBase * 0.25);
+  const specialAllowance = roundToTwo(componentBase - basicPay - hra);
+  const statutoryDeductions = [
+    { label: "Provident Fund (PF)", amount: 0 },
+    { label: "Professional Tax", amount: 0 },
+    { label: "Income Tax / TDS", amount: 0 },
+    { label: "Other Deductions", amount: 0 }
+  ];
+  const totalStandardDeductions = statutoryDeductions.reduce((sum, item) => sum + item.amount, 0);
+  const totalDeductions = roundToTwo(row.deductions + totalStandardDeductions);
+  const netPay = roundToTwo(grossBeforeDeductions - totalDeductions);
+  const generatedDate = new Date().toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Payslip - ${employeeLabel}</title>
+  <title>Salary Slip - ${escapeHtml(employeeLabel)}</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 32px; color: #173148; }
-    .sheet { max-width: 860px; margin: 0 auto; border: 1px solid #d7e7f6; border-radius: 18px; overflow: hidden; }
-    .hero { background: linear-gradient(135deg, #2b587e, #3e74a4); color: white; padding: 24px 28px; }
-    .hero h1 { margin: 0 0 6px; font-size: 28px; }
-    .hero p { margin: 0; opacity: 0.88; }
-    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 24px 28px; }
-    .card { border: 1px solid #deebf6; border-radius: 16px; padding: 16px; background: #f9fcff; }
-    .label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #617991; margin-bottom: 8px; }
-    .value { font-size: 24px; font-weight: 700; }
-    table { width: calc(100% - 56px); margin: 0 28px 28px; border-collapse: collapse; }
-    th, td { padding: 12px 10px; border-bottom: 1px solid #deebf6; text-align: left; }
-    th { color: #214867; background: #eff6fc; }
-    .muted { color: #617991; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #eef3f7; color: #162f45; font-family: Arial, Helvetica, sans-serif; }
+    .page { width: 210mm; min-height: 297mm; margin: 0 auto; padding: 16mm; background: #fff; }
+    .sheet { border: 1px solid #cfdce8; }
+    .letterhead { display: grid; grid-template-columns: 1fr auto; gap: 18px; padding: 22px 24px; border-bottom: 4px solid #315f86; }
+    .brand { display: flex; gap: 14px; align-items: center; }
+    .logo { width: 58px; height: 58px; border-radius: 14px; display: grid; place-items: center; background: #315f86; color: #fff; font-weight: 800; font-size: 22px; letter-spacing: 0.03em; }
+    .company h1 { margin: 0; color: #173148; font-size: 24px; letter-spacing: 0.01em; text-transform: uppercase; }
+    .company p, .contact p { margin: 4px 0 0; color: #526b80; font-size: 12px; line-height: 1.35; }
+    .contact { text-align: right; max-width: 250px; }
+    .titlebar { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 16px 24px; background: #f3f8fc; border-bottom: 1px solid #dbe7f1; }
+    .titlebar h2 { margin: 0; color: #173148; font-size: 20px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .status { display: inline-flex; padding: 7px 12px; border-radius: 999px; background: #e9f1f8; color: #315f86; font-size: 12px; font-weight: 700; }
+    .section { padding: 18px 24px; border-bottom: 1px solid #e1ebf3; }
+    .section:last-child { border-bottom: 0; }
+    .info-grid { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #dbe7f1; }
+    .info-item { min-height: 66px; padding: 11px 12px; border-right: 1px solid #dbe7f1; border-bottom: 1px solid #dbe7f1; }
+    .info-item:nth-child(4n) { border-right: 0; }
+    .info-item:nth-last-child(-n + 4) { border-bottom: 0; }
+    .label { display: block; color: #60788f; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+    .value { display: block; color: #173148; font-size: 13px; font-weight: 700; line-height: 1.3; }
+    .summary-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .summary-card { border: 1px solid #dbe7f1; background: #fbfdff; padding: 12px; min-height: 76px; }
+    .summary-card strong { display: block; margin-top: 5px; color: #173148; font-size: 17px; }
+    .tables { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+    table { width: 100%; border-collapse: collapse; border: 1px solid #dbe7f1; }
+    th { background: #315f86; color: #fff; font-size: 11px; text-align: left; text-transform: uppercase; letter-spacing: 0.04em; }
+    th, td { padding: 10px 11px; border-bottom: 1px solid #e1ebf3; }
+    td { color: #173148; font-size: 12px; }
+    td.amount, th.amount { text-align: right; }
+    tfoot td { background: #f3f8fc; font-weight: 800; }
+    .netpay { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; border: 1px solid #315f86; background: #f4f9fd; padding: 16px 18px; }
+    .netpay span { color: #60788f; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    .netpay strong { display: block; margin-top: 5px; color: #173148; font-size: 24px; }
+    .note { margin-top: 10px; color: #60788f; font-size: 11px; line-height: 1.45; }
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; padding-top: 24px; }
+    .signature-box { min-height: 90px; display: grid; align-content: end; }
+    .signature-line { border-top: 1px solid #9fb4c6; padding-top: 8px; color: #173148; font-size: 12px; font-weight: 700; }
+    .signature-line span { display: block; margin-top: 3px; color: #60788f; font-size: 11px; font-weight: 500; }
+    .footer { padding: 12px 24px; background: #f8fbfe; color: #60788f; font-size: 10px; text-align: center; border-top: 1px solid #e1ebf3; }
+    @media print {
+      body { background: #fff; }
+      .page { width: auto; min-height: auto; padding: 0; }
+      .sheet { border-color: #b8c9d8; }
+      @page { size: A4; margin: 12mm; }
+    }
   </style>
 </head>
 <body>
+  <div class="page">
   <div class="sheet">
-    <div class="hero">
-      <h1>Payslip</h1>
-      <p>${employeeLabel} | ${row.monthLabel}</p>
+    <header class="letterhead">
+      <div class="brand">
+        <div class="logo">TD</div>
+        <div class="company">
+          <h1>Trishoka Digital Services</h1>
+          <p>Prajay Princeton Towers, Doctors Colony, L.B. Nagar, HYD</p>
+        </div>
+      </div>
+      <div class="contact">
+        <p>+91 9493401014</p>
+        <p>trishokadigiservices@gmail.com</p>
+        <p>www.trishoka.com</p>
+      </div>
+    </header>
+
+    <div class="titlebar">
+      <h2>Salary Slip</h2>
+      <span class="status">${escapeHtml(row.statusLabel)}</span>
     </div>
-    <div class="grid">
-      <div class="card"><div class="label">Monthly Salary</div><div class="value">${formatCurrency(row.baseSalary)}</div></div>
-      <div class="card"><div class="label">Final Payable Amount</div><div class="value">${formatCurrency(row.payableAmount)}</div></div>
-      <div class="card"><div class="label">Per Day Salary</div><div class="value">${formatCurrency(row.perDayRate)}</div></div>
-      <div class="card"><div class="label">Payroll Status</div><div class="value">${row.statusLabel}</div></div>
+
+    <section class="section">
+      <div class="info-grid">
+        <div class="info-item"><span class="label">Employee Name</span><span class="value">${escapeHtml(row.employeeName)}</span></div>
+        <div class="info-item"><span class="label">Employee ID</span><span class="value">${escapeHtml(row.employeeCode || "Not assigned")}</span></div>
+        <div class="info-item"><span class="label">Department</span><span class="value">${escapeHtml(row.department || "Unassigned")}</span></div>
+        <div class="info-item"><span class="label">Pay Period</span><span class="value">${escapeHtml(row.monthLabel)}</span></div>
+        <div class="info-item"><span class="label">Generated Date</span><span class="value">${generatedDate}</span></div>
+        <div class="info-item"><span class="label">Monthly CTC/Gross</span><span class="value">${formatCurrency(row.baseSalary)}</span></div>
+        <div class="info-item"><span class="label">Per Day Rate</span><span class="value">${formatCurrency(row.perDayRate)}</span></div>
+        <div class="info-item"><span class="label">Payroll Type</span><span class="value">Monthly Salary</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="summary-strip">
+        <div class="summary-card"><span class="label">Total Working Days</span><strong>${formatCount(row.totalWorkingDays)}</strong></div>
+        <div class="summary-card"><span class="label">Payable Days</span><strong>${formatCount(row.payableDays)}</strong></div>
+        <div class="summary-card"><span class="label">LOP Days</span><strong>${formatCount(row.lopDays)}</strong></div>
+        <div class="summary-card"><span class="label">Public Holidays</span><strong>${formatCount(row.holidayDays)}</strong></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="tables">
+        <table>
+          <thead><tr><th>Earnings</th><th class="amount">Amount</th></tr></thead>
+          <tbody>
+            <tr><td>Basic Pay</td><td class="amount">${formatCurrency(basicPay)}</td></tr>
+            <tr><td>House Rent Allowance</td><td class="amount">${formatCurrency(hra)}</td></tr>
+            <tr><td>Special Allowance</td><td class="amount">${formatCurrency(specialAllowance)}</td></tr>
+          </tbody>
+          <tfoot><tr><td>Gross Earnings</td><td class="amount">${formatCurrency(grossBeforeDeductions)}</td></tr></tfoot>
+        </table>
+
+        <table>
+          <thead><tr><th>Deductions</th><th class="amount">Amount</th></tr></thead>
+          <tbody>
+            <tr><td>Loss of Pay Deduction</td><td class="amount">${formatCurrency(row.deductions)}</td></tr>
+            ${statutoryDeductions.map(item => `<tr><td>${item.label}</td><td class="amount">${formatCurrency(item.amount)}</td></tr>`).join("")}
+          </tbody>
+          <tfoot><tr><td>Total Deductions</td><td class="amount">${formatCurrency(totalDeductions)}</td></tr></tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="netpay">
+        <div>
+          <span>Net Salary Payable</span>
+          <strong>${formatCurrency(netPay)}</strong>
+        </div>
+        <div>
+          <span>Payment Status</span>
+          <strong>${escapeHtml(row.generatedAt ? "Finalized" : "Preview")}</strong>
+        </div>
+      </div>
+      <p class="note">
+        Attendance basis: Present ${formatCount(row.presentDays)}, Paid Sick Leave ${formatCount(row.paidSickLeaveDays)}, Public Holidays ${formatCount(row.holidayDays)}, LOP ${formatCount(row.lopDays)}.
+        PF, professional tax, TDS, and other statutory deductions are marked as zero as per current payroll configuration.
+      </p>
+      ${row.hasValidationIssue ? `<p class="note">Payroll validation note: stored values were adjusted for display consistency before generating this payslip.</p>` : ""}
+    </section>
+
+    <section class="section">
+      <div class="signatures">
+        <div class="signature-box">
+          <div class="signature-line">Employee Acknowledgement<span>${escapeHtml(row.employeeName)}</span></div>
+        </div>
+        <div class="signature-box">
+          <div class="signature-line">KVS Koushik<span>Managing Director</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      This is a computer-generated salary slip from Trishoka Digital Services. Please contact HR for corrections or payroll clarifications.
     </div>
-    <table>
-      <thead>
-        <tr>
-          <th>Metric</th>
-          <th>Value</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr><td>Present Days</td><td>${formatCount(row.presentDays)}</td></tr>
-        <tr><td>Paid Sick Leave</td><td>${formatCount(row.paidSickLeaveDays)}</td></tr>
-        <tr><td>Public Holidays</td><td>${formatCount(row.holidayDays)}</td></tr>
-        <tr><td>LOP Days</td><td>${formatCount(row.lopDays)}</td></tr>
-        <tr><td>Total Working Days</td><td>${formatCount(row.totalWorkingDays)}</td></tr>
-        <tr><td>Deductions</td><td>${formatCurrency(row.deductions)}</td></tr>
-        <tr><td>Final Payable Amount</td><td>${formatCurrency(row.payableAmount)}</td></tr>
-      </tbody>
-    </table>
+  </div>
   </div>
   ${shouldPrint ? `
   <script>
