@@ -105,21 +105,27 @@ function enhancePayrollRow(row, employeeDirectory = {}) {
   const employeeRef = employeeDirectory[row.employee_id] || {};
   const presentDays = roundToTwo(row.present_days);
   const holidayDays = roundToTwo(row.public_holiday_days);
+  const weeklyOffDays = roundToTwo(row.weekly_off_days);
+  const publicHolidayDays = Math.max(0, roundToTwo(holidayDays - weeklyOffDays));
   const sickLeaveDays = roundToTwo(row.sick_leave_days);
   const paidSickLeaveDays = roundToTwo(row.paid_sick_leave_days);
   const lopDays = roundToTwo(row.lop_days);
   const absentDays = roundToTwo(row.absent_days);
   const baseSalary = roundToTwo(row.base_salary);
   const perDayRate = roundToTwo(row.per_day_rate);
+  const exactPerDayRate = row.calendar_days
+    ? toNumber(row.base_salary) / toNumber(row.calendar_days)
+    : toNumber(row.per_day_rate);
   const expectedPayableDays = roundToTwo(presentDays + holidayDays + paidSickLeaveDays);
   const storedPayableDays = roundToTwo(row.payable_days);
   const totalWorkingDays = roundToTwo(
     row.total_working_days || expectedPayableDays + lopDays
   );
+  const scheduledWorkingDays = roundToTwo(row.scheduled_working_days || totalWorkingDays - holidayDays);
   const deductions = roundToTwo(
-    row.deduction_amount || lopDays * perDayRate
+    row.deduction_amount || lopDays * exactPerDayRate
   );
-  const validatedAmount = roundToTwo(expectedPayableDays * perDayRate);
+  const validatedAmount = roundToTwo(expectedPayableDays * exactPerDayRate);
   const storedAmount = roundToTwo(row.payable_amount);
   const hasPayableMismatch = Math.abs(expectedPayableDays - storedPayableDays) > 0.01;
   const hasAmountMismatch = Math.abs(validatedAmount - storedAmount) > 0.01;
@@ -150,6 +156,8 @@ function enhancePayrollRow(row, employeeDirectory = {}) {
     perDayRate,
     presentDays,
     holidayDays,
+    publicHolidayDays,
+    weeklyOffDays,
     sickLeaveDays,
     paidSickLeaveDays,
     lopDays,
@@ -157,6 +165,7 @@ function enhancePayrollRow(row, employeeDirectory = {}) {
     payableDays: expectedPayableDays,
     storedPayableDays,
     totalWorkingDays,
+    scheduledWorkingDays,
     deductions,
     payableAmount: validatedAmount,
     storedAmount,
@@ -174,7 +183,10 @@ function aggregateRows(rows) {
     payableDays: totals.payableDays + row.payableDays,
     lopDays: totals.lopDays + row.lopDays,
     holidays: totals.holidays + row.holidayDays,
+    publicHolidays: totals.publicHolidays + row.publicHolidayDays,
+    weeklyOffs: totals.weeklyOffs + row.weeklyOffDays,
     totalWorkingDays: totals.totalWorkingDays + row.totalWorkingDays,
+    scheduledWorkingDays: totals.scheduledWorkingDays + row.scheduledWorkingDays,
     presentDays: totals.presentDays + row.presentDays,
     sickLeaveDays: totals.sickLeaveDays + row.sickLeaveDays,
     paidSickLeaveDays: totals.paidSickLeaveDays + row.paidSickLeaveDays
@@ -183,7 +195,10 @@ function aggregateRows(rows) {
     payableDays: 0,
     lopDays: 0,
     holidays: 0,
+    publicHolidays: 0,
+    weeklyOffs: 0,
     totalWorkingDays: 0,
+    scheduledWorkingDays: 0,
     presentDays: 0,
     sickLeaveDays: 0,
     paidSickLeaveDays: 0
@@ -329,10 +344,10 @@ function buildPayslipHtml(row, shouldPrint = false) {
 
     <section class="section">
       <div class="summary-strip">
-        <div class="summary-card"><span class="label">Total Working Days</span><strong>${formatCount(row.totalWorkingDays)}</strong></div>
+        <div class="summary-card"><span class="label">Payroll Days</span><strong>${formatCount(row.totalWorkingDays)}</strong></div>
         <div class="summary-card"><span class="label">Payable Days</span><strong>${formatCount(row.payableDays)}</strong></div>
         <div class="summary-card"><span class="label">LOP Days</span><strong>${formatCount(row.lopDays)}</strong></div>
-        <div class="summary-card"><span class="label">Public Holidays</span><strong>${formatCount(row.holidayDays)}</strong></div>
+        <div class="summary-card"><span class="label">Public Holidays</span><strong>${formatCount(row.publicHolidayDays)}</strong></div>
       </div>
     </section>
 
@@ -371,7 +386,7 @@ function buildPayslipHtml(row, shouldPrint = false) {
         </div>
       </div>
       <p class="note">
-        Attendance basis: Present ${formatCount(row.presentDays)}, Paid Sick Leave ${formatCount(row.paidSickLeaveDays)}, Public Holidays ${formatCount(row.holidayDays)}, LOP ${formatCount(row.lopDays)}.
+        Attendance basis: Present ${formatCount(row.presentDays)}, Paid Sick Leave ${formatCount(row.paidSickLeaveDays)}, Public Holidays ${formatCount(row.publicHolidayDays)}, Weekly Offs ${formatCount(row.weeklyOffDays)}, LOP ${formatCount(row.lopDays)}.
         PF, professional tax, TDS, and other statutory deductions are marked as zero as per current payroll configuration.
       </p>
       ${row.hasValidationIssue ? `<p class="note">Payroll validation note: stored values were adjusted for display consistency before generating this payslip.</p>` : ""}
@@ -599,10 +614,11 @@ export default function PayrollPage() {
       "Per Day Salary",
       "Present Days",
       "Public Holidays",
+      "Weekly Offs",
       "Sick Leave",
       "Paid Sick Leave",
       "LOP Days",
-      "Total Working Days",
+      "Payroll Days",
       "Payable Days",
       "Deductions",
       "Payable Amount",
@@ -617,7 +633,8 @@ export default function PayrollPage() {
       row.baseSalary,
       row.perDayRate,
       row.presentDays,
-      row.holidayDays,
+      row.publicHolidayDays,
+      row.weeklyOffDays,
       row.sickLeaveDays,
       row.paidSickLeaveDays,
       row.lopDays,
@@ -672,7 +689,7 @@ export default function PayrollPage() {
           </div>
         </div>
         <div className="payroll-breakdown-formula">
-          Payable Days = Present + Paid Leave + Holidays
+          Payable Days = Present + Paid Leave + Public Holidays + Weekly Offs
         </div>
       </div>
       <div className="payroll-breakdown-grid">
@@ -693,8 +710,16 @@ export default function PayrollPage() {
           <strong>{formatCount(row.paidSickLeaveDays)}</strong>
         </div>
         <div className="payroll-breakdown-item">
-          <span>Holidays</span>
-          <strong>{formatCount(row.holidayDays)}</strong>
+          <span>Public Holidays</span>
+          <strong>{formatCount(row.publicHolidayDays)}</strong>
+        </div>
+        <div className="payroll-breakdown-item">
+          <span>Weekly Offs</span>
+          <strong>{formatCount(row.weeklyOffDays)}</strong>
+        </div>
+        <div className="payroll-breakdown-item">
+          <span>Scheduled Working</span>
+          <strong>{formatCount(row.scheduledWorkingDays)}</strong>
         </div>
         <div className="payroll-breakdown-item">
           <span>LOP Days</span>
@@ -766,14 +791,15 @@ export default function PayrollPage() {
                   <div className="payroll-summary-header">
                     <h2 className="section-title mb-1">Payroll Summary</h2>
                     <p className="text-muted mb-0">
-                      Payable Days = Present + Paid Leave + Public Holidays. Total Working Days = Payable Days + LOP Days.
+                      Payable Days = Present + Paid Leave + Public Holidays + Weekly Offs. Weekly offs never count as absent.
                     </p>
                   </div>
                 </div>
 
                 <div className="payroll-chip-row payroll-chip-row-tight mb-2">
                   <span className="payroll-chip">Month: {formatMonthLabel(month)}</span>
-                  <span className="payroll-chip">Paid Holidays: {formatCount(previewMeta.paidHolidayCount)}</span>
+                  <span className="payroll-chip">Public Holidays: {formatCount(previewMeta.paidHolidayCount)}</span>
+                  <span className="payroll-chip">Weekly Offs: {formatCount(previewMeta.weeklyOffCount)}</span>
                   <span className="payroll-chip">Paid Sick Leave Allowance: {formatCount(previewMeta.sickLeaveAllowance)}</span>
                   {previewMeta.effectiveEnd ? <span className="payroll-chip">Calculated Till: {formatDisplayDate(previewMeta.effectiveEnd)}</span> : null}
                 </div>
@@ -823,8 +849,12 @@ export default function PayrollPage() {
                     <div className="stat-value">{formatCurrency(summary.amount)}</div>
                   </div>
                   <div className="stat-box">
-                    <div className="stat-label">Total Working Days</div>
+                    <div className="stat-label">Payroll Days</div>
                     <div className="stat-value">{formatCount(summary.totalWorkingDays)}</div>
+                  </div>
+                  <div className="stat-box">
+                    <div className="stat-label">Scheduled Working</div>
+                    <div className="stat-value">{formatCount(summary.scheduledWorkingDays)}</div>
                   </div>
                   <div className="stat-box stat-box-positive">
                     <div className="stat-label">Payable Days</div>
@@ -836,7 +866,11 @@ export default function PayrollPage() {
                   </div>
                   <div className="stat-box">
                     <div className="stat-label">Public Holidays</div>
-                    <div className="stat-value">{formatCount(summary.holidays)}</div>
+                    <div className="stat-value">{formatCount(summary.publicHolidays)}</div>
+                  </div>
+                  <div className="stat-box">
+                    <div className="stat-label">Weekly Offs</div>
+                    <div className="stat-value">{formatCount(summary.weeklyOffs)}</div>
                   </div>
                 </div>
 
@@ -867,10 +901,11 @@ export default function PayrollPage() {
                           <th>Department</th>
                           <th>Status</th>
                           <th>Present</th>
-                          <th>Holiday</th>
+                          <th>Public Holiday</th>
+                          <th>Weekly Off</th>
                           <th>Sick Leave</th>
                           <th>Paid Sick</th>
-                          <th>Total Working</th>
+                          <th>Payroll Days</th>
                           <th>LOP</th>
                           <th>Payable Days</th>
                           <th>Amount</th>
@@ -894,7 +929,8 @@ export default function PayrollPage() {
                               <td>{row.department}</td>
                               <td><span className={`payroll-badge tone-${row.statusTone}`}>{row.statusLabel}</span></td>
                               <td>{formatCount(row.presentDays)}</td>
-                              <td>{formatCount(row.holidayDays)}</td>
+                              <td>{formatCount(row.publicHolidayDays)}</td>
+                              <td>{formatCount(row.weeklyOffDays)}</td>
                               <td>{formatCount(row.sickLeaveDays)}</td>
                               <td>{formatCount(row.paidSickLeaveDays)}</td>
                               <td>{formatCount(row.totalWorkingDays)}</td>
@@ -913,13 +949,13 @@ export default function PayrollPage() {
                             </tr>
                             {expandedRowKey === row.key ? (
                               <tr className="payroll-detail-row">
-                                <td colSpan={12}>{renderBreakdownPanel(row)}</td>
+                                <td colSpan={13}>{renderBreakdownPanel(row)}</td>
                               </tr>
                             ) : null}
                           </Fragment>
                         )) : (
                           <tr>
-                            <td colSpan={12} className="text-center text-muted py-4">No payroll data available for the current filters.</td>
+                            <td colSpan={13} className="text-center text-muted py-4">No payroll data available for the current filters.</td>
                           </tr>
                         )}
                       </tbody>
@@ -930,7 +966,8 @@ export default function PayrollPage() {
                             <td>-</td>
                             <td>-</td>
                             <td>{formatCount(summary.presentDays)}</td>
-                            <td>{formatCount(summary.holidays)}</td>
+                            <td>{formatCount(summary.publicHolidays)}</td>
+                            <td>{formatCount(summary.weeklyOffs)}</td>
                             <td>{formatCount(summary.sickLeaveDays)}</td>
                             <td>{formatCount(summary.paidSickLeaveDays)}</td>
                             <td>{formatCount(summary.totalWorkingDays)}</td>
@@ -1144,7 +1181,7 @@ export default function PayrollPage() {
               <div className="stat-value">{formatCurrency(summary.amount)}</div>
             </div>
             <div className="stat-box">
-              <div className="stat-label">Total Working Days</div>
+              <div className="stat-label">Payroll Days</div>
               <div className="stat-value">{formatCount(summary.totalWorkingDays)}</div>
             </div>
             <div className="stat-box stat-box-positive">
@@ -1202,11 +1239,12 @@ export default function PayrollPage() {
                   <div className="employee-attendance-grid">
                     <div><span>Present</span><strong>{formatCount(employeeCurrentRow.presentDays)}</strong></div>
                     <div><span>Paid Leave</span><strong>{formatCount(employeeCurrentRow.paidSickLeaveDays)}</strong></div>
-                    <div><span>Holidays</span><strong>{formatCount(employeeCurrentRow.holidayDays)}</strong></div>
+                    <div><span>Public Holidays</span><strong>{formatCount(employeeCurrentRow.publicHolidayDays)}</strong></div>
+                    <div><span>Weekly Offs</span><strong>{formatCount(employeeCurrentRow.weeklyOffDays)}</strong></div>
                     <div><span>LOP</span><strong className="text-danger">{formatCount(employeeCurrentRow.lopDays)}</strong></div>
                   </div>
                   <p className="text-muted mb-0 small">
-                    Payable days are calculated from present days, paid sick leave, and paid public holidays.
+                    Payable days are calculated from present days, paid sick leave, public holidays, and weekly offs.
                   </p>
                 </>
               ) : (
@@ -1244,7 +1282,7 @@ export default function PayrollPage() {
                 <tr>
                   <th>Month</th>
                   <th>Status</th>
-                  <th>Total Working</th>
+                  <th>Payroll Days</th>
                   <th>LOP</th>
                   <th>Payable Days</th>
                   <th>Amount</th>
@@ -1291,7 +1329,7 @@ export default function PayrollPage() {
                   <span className={`payroll-badge tone-${row.statusTone}`}>{row.statusLabel}</span>
                 </div>
                 <div className="payroll-mobile-metrics">
-                  <div><span>Total Working</span><strong>{formatCount(row.totalWorkingDays)}</strong></div>
+                  <div><span>Payroll Days</span><strong>{formatCount(row.totalWorkingDays)}</strong></div>
                   <div><span>LOP</span><strong className="text-danger">{formatCount(row.lopDays)}</strong></div>
                   <div><span>Payable Days</span><strong className="text-success">{formatCount(row.payableDays)}</strong></div>
                   <div><span>Amount</span><strong>{formatCurrency(row.payableAmount)}</strong></div>
@@ -1334,7 +1372,7 @@ export default function PayrollPage() {
                 <div className="employee-history-metrics">
                   <span>Payable {formatCount(row.payableDays)}</span>
                   <span>LOP {formatCount(row.lopDays)}</span>
-                  <span>Working {formatCount(row.totalWorkingDays)}</span>
+                  <span>Payroll {formatCount(row.totalWorkingDays)}</span>
                 </div>
               </article>
             )) : <div className="empty-state">No payroll history found for {formatMonthLabel(historyMonth)}.</div>}
