@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { apiRequest, withAuth } from "../lib/api";
+import { apiRequest, withSessionAuth } from "../lib/api";
 import { useState } from "react";
 
 const navGroups = [
@@ -26,15 +26,15 @@ const navGroups = [
 ];
 
 export default function AppShell() {
-  const { token, user, isAdmin, logout } = useAuth();
+  const { token, sessionId, user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
-    try {
-      if (token) {
-        await apiRequest("/api/login/logout", withAuth(token, { method: "POST" }));
-      }
+      try {
+        if (token) {
+        await apiRequest("/api/login/logout", withSessionAuth(token, sessionId, { method: "POST" }));
+        }
     } catch (error) {
       console.error(error);
     } finally {

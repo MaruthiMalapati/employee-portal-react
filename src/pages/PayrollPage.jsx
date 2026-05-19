@@ -522,6 +522,7 @@ export default function PayrollPage() {
       setPreviewMeta({
         effectiveEnd: result.effectiveEnd || result.effective_end || result.end || "",
         paidHolidayCount: toNumber(result.paidHolidayCount),
+        weeklyOffCount: toNumber(result.weeklyOffCount),
         sickLeaveAllowance: toNumber(result.sickLeaveAllowance || 1)
       });
       setExpandedRowKey("");
@@ -547,14 +548,16 @@ export default function PayrollPage() {
 
   const loadMyHistory = async (monthValue, forPreview) => {
     try {
-      const result = await apiRequest(`/api/payroll/my-history?month=${monthValue}`, withAuth(token));
+      const endpoint = forPreview ? "my-preview" : "my-history";
+      const result = await apiRequest(`/api/payroll/${endpoint}?month=${monthValue}`, withAuth(token));
       const rows = result.data || [];
       if (forPreview) {
         setPreviewRows(rows);
         setPreviewMeta({
-          effectiveEnd: rows[0]?.payroll_month || "",
-          paidHolidayCount: 0,
-          sickLeaveAllowance: 1
+          effectiveEnd: result.effectiveEnd || result.effective_end || result.end || rows[0]?.payroll_month || "",
+          paidHolidayCount: toNumber(result.paidHolidayCount),
+          weeklyOffCount: toNumber(result.weeklyOffCount),
+          sickLeaveAllowance: toNumber(result.sickLeaveAllowance || 1)
         });
         setExpandedRowKey("");
       } else {

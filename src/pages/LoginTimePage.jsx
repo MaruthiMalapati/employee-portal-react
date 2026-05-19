@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import { apiRequest, withAuth } from "../lib/api";
+import { apiRequest, withAuth, withSessionAuth } from "../lib/api";
 import "./LoginTimePage.css";
 
 const AUTO_LOGOUT_LABEL = "6:30 PM IST";
@@ -33,6 +33,10 @@ function formatHours(value) {
   return `${Number(value || 0).toFixed(2)} hrs`;
 }
 
+function getCurrentSessionLogoutValue(session) {
+  return session?.logout_time ? formatTime(session.logout_time) : "--:--";
+}
+
 function getStatusTone(status) {
   const normalized = String(status || "").toLowerCase();
   if (normalized.includes("present")) return "success";
@@ -42,10 +46,13 @@ function getStatusTone(status) {
   return "muted";
 }
 
-function getDisplayStatus(attendance, session) {
-  if (attendance?.status) return attendance.status;
-  if (session?.login_time && !session?.logout_time) return "Present";
+function getDisplayStatus(attendance, session, activeSession) {
+  if (session?.login_time && !session?.logout_time) return attendance?.status || "Present";
+  if (session?.logout_time && activeSession && activeSession.id !== session.id) return "Active on another device";
+  if (activeSession?.login_time && !activeSession?.logout_time) return attendance?.status || "Present";
   if (session?.logout_time) return "Logged out";
+  if (attendance?.status && attendance.status !== "Present") return attendance.status;
+  if (attendance?.first_login_time) return "Logged out";
   return "No record";
 }
 
@@ -56,9 +63,11 @@ function getLiveSessionHours(session, now) {
 }
 
 export default function LoginTimePage() {
-  const { token, isAdmin, user } = useAuth();
+  const { token, sessionId, isAdmin, user } = useAuth();
   const [session, setSession] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
   const [attendance, setAttendance] = useState(null);
+  const [todaySessions, setTodaySessions] = useState([]);
   const [recentAttendance, setRecentAttendance] = useState([]);
   const [adminRows, setAdminRows] = useState([]);
   const [adminSummary, setAdminSummary] = useState(null);
@@ -83,9 +92,11 @@ export default function LoginTimePage() {
 
   const loadSession = async () => {
     try {
-      const result = await apiRequest("/api/login/employee-session-status", withAuth(token));
+      const result = await apiRequest("/api/login/employee-session-status", withSessionAuth(token, sessionId));
       setSession(result.session || null);
+      setActiveSession(result.activeSession || null);
       setAttendance(result.attendance || null);
+      setTodaySessions(result.todaySessions || []);
       setRecentAttendance(result.recentAttendance || []);
       setMessage("");
     } catch (requestError) {
@@ -107,7 +118,7 @@ export default function LoginTimePage() {
   const logout = async () => {
     setMessage("Logging out...");
     try {
-      await apiRequest("/api/login/logout", withAuth(token, { method: "POST" }));
+      await apiRequest("/api/login/logout", withSessionAuth(token, sessionId, { method: "POST" }));
       await loadSession();
       setMessage("Logout successful. Working hours updated.");
     } catch (requestError) {
@@ -130,12 +141,19 @@ export default function LoginTimePage() {
   }, [adminRows, employeeSearch, statusFilter]);
 
   const liveSessionHours = getLiveSessionHours(session, now);
-  const displayStatus = getDisplayStatus(attendance, session);
+  const displayStatus = getDisplayStatus(attendance, session, activeSession);
   const statusTone = getStatusTone(displayStatus);
+  const currentSessionLogoutValue = getCurrentSessionLogoutValue(session);
   const timelineItems = [
     { label: "Login", value: formatTime(attendance?.first_login_time || session?.login_time), active: Boolean(attendance?.first_login_time || session?.login_time) },
-    { label: "Current Session", value: liveSessionHours === null ? "Completed" : "Running", active: Boolean(session?.login_time && !session?.logout_time) },
-    { label: "Logout", value: formatTime(attendance?.last_logout_time || session?.logout_time), active: Boolean(attendance?.last_logout_time || session?.logout_time) },
+    {
+      label: "Current Session",
+      value: liveSessionHours === null
+        ? (activeSession?.login_time && !activeSession?.logout_time ? "Running elsewhere" : "Completed")
+        : "Running",
+      active: Boolean(session?.login_time && !session?.logout_time) || Boolean(activeSession?.login_time && !activeSession?.logout_time)
+    },
+    { label: "Logout", value: currentSessionLogoutValue, active: Boolean(session?.logout_time) },
     { label: "Auto Logout", value: AUTO_LOGOUT_LABEL, active: true }
   ];
 
@@ -327,7 +345,7 @@ export default function LoginTimePage() {
 
             <div className="stats-grid login-employee-stats">
               <div className="stat-box"><div className="stat-label">Login Time</div><div className="stat-value">{formatTime(attendance?.first_login_time || session?.login_time)}</div></div>
-              <div className="stat-box"><div className="stat-label">Logout Time</div><div className="stat-value">{formatTime(attendance?.last_logout_time || session?.logout_time)}</div></div>
+              <div className="stat-box"><div className="stat-label">Logout Time</div><div className="stat-value">{currentSessionLogoutValue}</div></div>
               <div className="stat-box"><div className="stat-label">Working Hours</div><div className="stat-value">{liveSessionHours === null ? formatHours(attendance?.working_hours) : `${liveSessionHours.toFixed(2)} hrs`}</div></div>
               <div className={`stat-box login-status-card tone-${statusTone}`}><div className="stat-label">Status</div><div className="stat-value">{displayStatus}</div></div>
             </div>
@@ -346,9 +364,9 @@ export default function LoginTimePage() {
               </div>
               <div className="login-timeline">
                 {timelineItems.map(item => (
-                  <div className={item.active ? "active" : ""} key={item.label}>
-                    <span></span>
-                    <div>
+                  <div className={`login-timeline-item ${item.active ? "active" : ""}`} key={item.label}>
+                    <span className="login-timeline-dot"></span>
+                    <div className="login-timeline-copy">
                       <strong>{item.label}</strong>
                       <p>{item.value}</p>
                     </div>
@@ -373,6 +391,27 @@ export default function LoginTimePage() {
               </div>
             </section>
           </div>
+
+          <section className="content-card">
+            <h2 className="section-title mb-1">Today&apos;s Login & Logout History</h2>
+            <p className="text-muted mb-3">Each login session recorded for today.</p>
+            <div className="login-day-session-list">
+              {todaySessions.length ? todaySessions.map((entry, index) => (
+                <article className="login-day-session-card" key={entry.id || `${entry.login_time}-${index}`}>
+                  <div className="login-day-session-head">
+                    <strong>Session {todaySessions.length - index}</strong>
+                    <span className={`login-status-badge tone-${entry.logout_time ? "primary" : "success"}`}>
+                      {entry.logout_time ? (entry.logout_type === "auto" ? "Auto logged out" : "Logged out") : "Active"}
+                    </span>
+                  </div>
+                  <div className="login-day-session-metrics">
+                    <div><span>Login</span><strong>{formatTime(entry.login_time)}</strong></div>
+                    <div><span>Logout</span><strong>{entry.logout_time ? formatTime(entry.logout_time) : "--:--"}</strong></div>
+                  </div>
+                </article>
+              )) : <div className="empty-state">No login or logout history recorded for today.</div>}
+            </div>
+          </section>
         </>
       )}
     </div>

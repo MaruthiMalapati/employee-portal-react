@@ -39,4 +39,14 @@ export function withAuth(token, options = {}) {
   };
 }
 
+export function withSessionAuth(token, sessionId, options = {}) {
+  return withAuth(token, {
+    ...options,
+    headers: {
+      ...(sessionId ? { "X-Session-Id": sessionId } : {}),
+      ...(options.headers || {})
+    }
+  });
+}
+
 export { API_BASE_URL };

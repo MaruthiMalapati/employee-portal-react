@@ -43,6 +43,7 @@ export default function LoginPage() {
 
       login({
         token: result.token,
+        sessionId: result.sessionId,
         employee: {
           ...result.employee,
           username

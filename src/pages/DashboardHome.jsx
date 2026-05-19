@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { apiRequest, withAuth } from "../lib/api";
+import { apiRequest, withAuth, withSessionAuth } from "../lib/api";
 import "./DashboardHome.css";
 
 function getTodayISTDate() {
@@ -43,14 +43,25 @@ function statusTone(status) {
   return "primary";
 }
 
+function getEmployeeAttendanceStatus(attendance, session, activeSession) {
+  if (session?.login_time && !session?.logout_time) return attendance?.status || "Present";
+  if (session?.logout_time && activeSession && activeSession.id !== session.id) return "Active on another device";
+  if (activeSession?.login_time && !activeSession?.logout_time) return attendance?.status || "Present";
+  if (session?.logout_time) return "Logged out";
+  if (attendance?.status && attendance.status !== "Present") return attendance.status;
+  if (attendance?.first_login_time) return "Logged out";
+  return "No record";
+}
+
 export default function DashboardHome() {
-  const { token, user, isAdmin } = useAuth();
+  const { token, sessionId, user, isAdmin } = useAuth();
   const today = getTodayISTDate();
   const month = getCurrentMonth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [attendance, setAttendance] = useState(null);
   const [session, setSession] = useState(null);
+  const [activeSession, setActiveSession] = useState(null);
   const [attendanceSummary, setAttendanceSummary] = useState(null);
   const [employees, setEmployees] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -79,13 +90,14 @@ export default function DashboardHome() {
         if (payrollResult.status === "fulfilled") setPayrollRows(payrollResult.value.data || []);
       } else {
         const [sessionResult, taskResult, payrollResult] = await Promise.allSettled([
-          apiRequest("/api/login/employee-session-status", withAuth(token)),
+          apiRequest("/api/login/employee-session-status", withSessionAuth(token, sessionId)),
           apiRequest(`/api/tasks/my?date=${today}`, withAuth(token)),
           apiRequest(`/api/payroll/my-history?month=${month}`, withAuth(token))
         ]);
 
         if (sessionResult.status === "fulfilled") {
           setSession(sessionResult.value.session || null);
+          setActiveSession(sessionResult.value.activeSession || null);
           setAttendance(sessionResult.value.attendance || null);
         }
         if (taskResult.status === "fulfilled") setTasks(taskResult.value.data || []);
@@ -105,11 +117,12 @@ export default function DashboardHome() {
   }, [tasks]);
 
   const payrollTotal = payrollRows.reduce((sum, row) => sum + Number(row.payable_amount || 0), 0);
+  const employeeAttendanceStatus = getEmployeeAttendanceStatus(attendance, session, activeSession);
   const heroStatus = isAdmin
     ? `${attendanceSummary?.presentToday || 0} present today • ${attendanceSummary?.notLoggedIn || 0} not logged in`
     : session?.login_time && !session?.logout_time
       ? `Logged in at ${formatTime(session.login_time)}`
-      : attendance?.status || "No login record today";
+      : employeeAttendanceStatus;
 
   const stats = isAdmin ? [
     { label: "Employees", value: employees.length, icon: "bi-people", tone: "primary" },
@@ -118,7 +131,7 @@ export default function DashboardHome() {
     { label: "Pending Tasks", value: taskStats.pending, icon: "bi-list-check", tone: "warning" },
     { label: "Payroll Preview", value: formatCurrency(payrollTotal), icon: "bi-wallet2", tone: "primary" }
   ] : [
-    { label: "Attendance", value: attendance?.status || (session?.login_time ? "Present" : "No record"), icon: "bi-stopwatch", tone: statusTone(attendance?.status || (session?.login_time ? "Present" : "No record")) },
+    { label: "Attendance", value: employeeAttendanceStatus, icon: "bi-stopwatch", tone: statusTone(employeeAttendanceStatus) },
     { label: "Login Time", value: formatTime(attendance?.first_login_time || session?.login_time), icon: "bi-box-arrow-in-right", tone: "primary" },
     { label: "Working Hours", value: formatHours(attendance?.working_hours), icon: "bi-clock-history", tone: "success" },
     { label: "Pending Tasks", value: taskStats.pending, icon: "bi-list-task", tone: "warning" },
@@ -142,7 +155,11 @@ export default function DashboardHome() {
     taskStats.pending ? `${taskStats.pending} task${taskStats.pending === 1 ? "" : "s"} are still pending for today.` : "No pending task pressure for today.",
     attendanceSummary?.lateLogins ? `${attendanceSummary.lateLogins} late login${attendanceSummary.lateLogins === 1 ? "" : "s"} need review.` : "No late-login pattern detected in the current summary."
   ] : [
-    session?.login_time && !session?.logout_time ? `Your live session started at ${formatTime(session.login_time)}.` : "You do not have a running session right now.",
+    session?.login_time && !session?.logout_time
+      ? `Your live session started at ${formatTime(session.login_time)}.`
+      : activeSession?.login_time && !activeSession?.logout_time
+        ? "Another device is still logged in for today."
+        : "You do not have a running session right now.",
     taskStats.pending ? `${taskStats.pending} task${taskStats.pending === 1 ? "" : "s"} still need your attention.` : "No pending tasks for today.",
     payrollRows.length ? `This month's payslip is available for ${formatCurrency(payrollRows[0]?.payable_amount)}.` : "This month's payslip is not finalized yet."
   ];

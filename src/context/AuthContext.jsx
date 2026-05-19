@@ -7,6 +7,7 @@ function readStoredAuth() {
   const name = localStorage.getItem("employeeName");
   const username = localStorage.getItem("employeeUsername");
   const role = localStorage.getItem("employeeRole");
+  const sessionId = localStorage.getItem("employeeSessionId");
 
   if (!token) {
     return null;
@@ -14,6 +15,7 @@ function readStoredAuth() {
 
   return {
     token,
+    sessionId: sessionId || "",
     user: {
       name: name || "",
       username: username || "",
@@ -34,14 +36,16 @@ export function AuthProvider({ children }) {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const login = ({ token, employee }) => {
+  const login = ({ token, employee, sessionId }) => {
     localStorage.setItem("authToken", token);
     localStorage.setItem("employeeName", employee.name || "");
     localStorage.setItem("employeeUsername", employee.username || "");
     localStorage.setItem("employeeRole", employee.role || "");
+    localStorage.setItem("employeeSessionId", sessionId || "");
 
     setAuth({
       token,
+      sessionId: sessionId || "",
       user: {
         name: employee.name || "",
         username: employee.username || "",
@@ -51,7 +55,11 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
-    localStorage.clear();
+    localStorage.removeItem("authToken");
+    localStorage.removeItem("employeeName");
+    localStorage.removeItem("employeeUsername");
+    localStorage.removeItem("employeeRole");
+    localStorage.removeItem("employeeSessionId");
     setAuth(null);
   };
 
@@ -60,6 +68,7 @@ export function AuthProvider({ children }) {
       value={{
         auth,
         token: auth?.token || "",
+        sessionId: auth?.sessionId || "",
         user: auth?.user || null,
         isAuthenticated: Boolean(auth?.token),
         isAdmin: auth?.user?.role === "ADMIN",
